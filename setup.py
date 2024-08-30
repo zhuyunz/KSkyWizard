@@ -19,8 +19,8 @@ LICENSE = metadata["license"]
 DESCRIPTION = metadata["description"]
 
 entry_points = {
-    'console_scripts': [
-        "xtrimpy = xtrimpy.xtrimpy:main"
+    'gui_scripts': [
+        "kskywizard = kskywizard.kskywizard:main"
     ]}
 
 setuptools.setup(name=NAME,
@@ -32,7 +32,7 @@ setuptools.setup(name=NAME,
       author=AUTHOR,
       author_email=AUTHOR_EMAIL,
       packages=setuptools.find_packages(),
-      package_data={'': ['lib/xtrim_icon.png', 'lib/line_list.dat']},
+      package_data={'': ['data/extin/*', 'data/stds/*']},
       entry_points=entry_points,
       install_requires=[
         'astropy',
