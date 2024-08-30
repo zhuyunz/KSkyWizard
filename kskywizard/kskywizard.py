@@ -1421,11 +1421,13 @@ class KCWIViewerApp:
             self.canvas.get_tk_widget().focus_set()
 
             self.plot_std()
-            inst = ("[INSTRUCTION] Press 'i' twice on each side of the region you want to include in the fit;"
-                    "press 'e' twice on each side of the region you want to exclude from the fit;"
-                    "press 'a' on the single data point you want to include in the fit;"
-                    "and press 'd' on the data point you want to exclude from the fit. "
-                    "First, to fit the sensitive function, press 'f'. Second, 'press' t to fit the telluric model [this may take a while]")
+            inst = ("[INSTRUCTIONS] \n"
+                    "'i' - include fitting regions;\n"
+                    "'e' - exclude fitting regions;\n"
+                    "'a' - add a single data point for fitting;\n"
+                    "'d' - delete a single data point;\n"
+                    "'f' - refit the sensitivity curve;\n"
+                    "'t' - fit the telluric model [this may take a while].")
             self.insert_text(inst)
 
     def save_updated_invsens(self):
