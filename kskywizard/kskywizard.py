@@ -1,7 +1,7 @@
 #package for GUI setup
 import tkinter as tk
 from tkinter import ttk
-from tkinter import filedialog, messagebox
+from tkinter import filedialog, messagebox, simpledialog
 from tkinter import scrolledtext
 import matplotlib.pyplot as plt
 import numpy as np
@@ -71,6 +71,9 @@ DAR_shift_order = 1
         
 class KCWIViewerApp:
     def __init__(self, root):
+        # initial setup
+        self.base = initial_dir
+
         """
         Initialize the GUI window
         """
@@ -142,9 +145,9 @@ class KCWIViewerApp:
         self.std_index_label.grid(row = 1, column = 0, sticky='ew')
         self.std_entry = tk.Entry(self.tab1)
         self.std_entry.grid(row = 1, column = 1, sticky='ew')
-        self.load_std_button = tk.Button(self.tab1, text = 'Browse DRP invsens', command = lambda: self.load_invsens('DRP'))
+        self.load_std_button = tk.Button(self.tab1, text = 'Open DRP invsens', command = lambda: self.load_invsens('DRP'))
         self.load_std_button.grid(row = 1, column = 2, sticky='ew')
-        self.load_std_update_button = tk.Button(self.tab1, text = 'Browse updated invsens', command = lambda: self.load_invsens('updated'))
+        self.load_std_update_button = tk.Button(self.tab1, text = 'Open updated invsens', command = lambda: self.load_invsens('updated'))
         self.load_std_update_button.grid(row = 1, column = 3, sticky='ew')
         self.save_std_button = tk.Button(self.tab1, text = 'Save updated invsens', command = self.save_updated_invsens)
         self.save_std_button.grid(row = 1, column = 4, sticky='ew')
@@ -495,7 +498,52 @@ class KCWIViewerApp:
         # self.plot_spectrum(hdu = self.scihdu[0].data, xrange = [self.region_idx[0], self.region_idx[2]], yrange = [self.region_idx[1], self.region_idx[3]])
         self.update_index_entries()
 
-            
+    def open_glob_file(self, initialdir=initial_dir, ext='*_invsens.fits'):
+        """tk on macOS does not support *_invsens.fits filters. Reinventing wheels here..."""
+        
+        # Get the directory from the base path
+        directory = initialdir
+        
+        # Get a list of files matching the pattern *_invsens.fits
+        matching_files = glob(os.path.join(directory, ext))
+
+        if not matching_files:
+            self.insert_text(f"[INFO] No files matching the pattern '{ext}' were found.")
+            return
+
+        # Create a new Toplevel window for file selection
+        file_selection_window = tk.Toplevel(self.root)
+        file_selection_window.title("Select file")
+
+        # Variable to store the selected file
+        selected_file = tk.StringVar()
+        
+        # Add a Listbox to display the matching files
+        listbox = tk.Listbox(file_selection_window, selectmode=tk.SINGLE, width=80, height=20)
+        listbox.pack(padx=10, pady=10)
+
+        # Populate the Listbox with matching files
+        for file in matching_files:
+            listbox.insert(tk.END, file)
+        
+        # Function to handle file selection
+        def select_file():
+            selected_index = listbox.curselection()
+            if selected_index:
+                selected_file.set(listbox.get(selected_index))
+                file_selection_window.destroy()
+            else:
+                self.insert_text("[INFO] No file selected.")
+        
+        # Add a button to confirm the selection
+        select_button = tk.Button(file_selection_window, text="Select", command=select_file)
+        select_button.pack(pady=5)
+
+        # Focus on the selection window
+        file_selection_window.grab_set()
+        self.root.wait_window(file_selection_window)
+
+        return selected_file.get() if selected_file.get() else None
             
 
     def browse_input_directory(self):
@@ -1291,92 +1339,94 @@ class KCWIViewerApp:
         Load the  _invsens.fits of a standard star.
         """
         if type == 'DRP':
-            filename = filedialog.askopenfilename(initialdir=self.base) #REAL code
-
+            #filename = filedialog.askopenfilename(initialdir=self.base, 
+            #    filetypes=(("DRP invsens files", "*.*invsens.fits"), ("All files", '*.*')))
+            filename = self.open_glob_file(initialdir=self.base, ext='*_invsens.fits')
         else:
-            filename = filedialog.askopenfilename(initialdir=self.output) #REAL code
+            filename = self.open_glob_file(initialdir=self.output, ext='*_invsens_update.fits')
         # filename = '/scr/zzhuang/keck_obs/kcwi/2023sep23/red/redux/kr230923_00174_invsens.fits' #for test purpose only
-        self.std_entry.delete(0, tk.END)
-        self.std_entry.insert(tk.END, filename)
+        if filename:
+            self.std_entry.delete(0, tk.END)
+            self.std_entry.insert(tk.END, filename)
 
-        #load the invsens file 
-        hdu = fits.open(self.std_entry.get())
-        self.std = {}
+            #load the invsens file 
+            hdu = fits.open(self.std_entry.get())
+            self.std = {}
 
-        hdr = hdu[0].header
-        wvl = (np.arange(hdr['NAXIS1']) + 1 - hdr['CRPIX1']) * hdr['CDELT1'] + hdr['CRVAL1']
-        #Add 3A on each side to give the spline-fit some buffer 
-        good = np.where((wvl >= hdr['WAVGOOD0'] - 3) & (wvl<= hdr['WAVGOOD1'] + 3))[0]
-        self.std['invsens_hdr'] = hdr
+            hdr = hdu[0].header
+            wvl = (np.arange(hdr['NAXIS1']) + 1 - hdr['CRPIX1']) * hdr['CDELT1'] + hdr['CRVAL1']
+            #Add 3A on each side to give the spline-fit some buffer 
+            good = np.where((wvl >= hdr['WAVGOOD0'] - 3) & (wvl<= hdr['WAVGOOD1'] + 3))[0]
+            self.std['invsens_hdr'] = hdr
 
-        #raw invsens from the DRP
-        if type == 'DRP':
-            self.std['wave'] = wvl[good]
-            #the first row is the raw ratio of real flux and count to be fitted for; second row the best-fit invsens; third row is the raw electron/s 
-            self.std['invsens_data'] = hdu[0].data[0, good]
-            self.std['invsens_model_drp'] = hdu[0].data[1, good]
-            self.std['counts'] = hdu[0].data[2, good]
-            self.std['name'] = hdr['OBJECT'].lower()
-            self.std['name'] = re.sub('[\ _]', '', self.std['name'])
-            self.std['frame'] = re.sub('_invsens.fits', '', os.path.basename(self.std_entry.get()))
-            flag = np.full(len(self.std['wave']), 1, dtype = int)
-            self.std['flag'] = self.mask_skyline_region(self.std['wave'], flag)
+            #raw invsens from the DRP
+            if type == 'DRP':
+                self.std['wave'] = wvl[good]
+                #the first row is the raw ratio of real flux and count to be fitted for; second row the best-fit invsens; third row is the raw electron/s 
+                self.std['invsens_data'] = hdu[0].data[0, good]
+                self.std['invsens_model_drp'] = hdu[0].data[1, good]
+                self.std['counts'] = hdu[0].data[2, good]
+                self.std['name'] = hdr['OBJECT'].lower()
+                self.std['name'] = re.sub('[\ _]', '', self.std['name'])
+                self.std['frame'] = re.sub('_invsens.fits', '', os.path.basename(self.std_entry.get()))
+                flag = np.full(len(self.std['wave']), 1, dtype = int)
+                self.std['flag'] = self.mask_skyline_region(self.std['wave'], flag)
 
-            #sens func and telluric model to be updated
-            self.std['invsens_model'] = None
-            self.std['tellmodel'] = None
-
-        #the updated version, so no need to crop the data
-        elif type == 'updated':
-            self.std['wave'] = wvl
-            #the first row is the raw ratio of real flux and count to be fitted for; second row the best-fit invsens; third row is the raw electron/s 
-            self.std['invsens_data'] = hdu[0].data[0]
-            self.std['invsens_model_drp'] = hdu[0].data[1]
-            self.std['counts'] = hdu[0].data[2]
-            self.std['name'] = hdr['OBJECT'].lower()
-            self.std['invsens_model'] = hdu[0].data[3]
-            self.std['flag'] = hdu[0].data[4]
-            if len(hdu[0].data) > 5:
-                self.std['tellmodel'] = hdu[0].data[5]
-            else:
+                #sens func and telluric model to be updated
+                self.std['invsens_model'] = None
                 self.std['tellmodel'] = None
-            self.std['frame'] = re.sub('_invsens_updated.fits', '', os.path.basename(self.std_entry.get()))
+
+            #the updated version, so no need to crop the data
+            elif type == 'updated':
+                self.std['wave'] = wvl
+                #the first row is the raw ratio of real flux and count to be fitted for; second row the best-fit invsens; third row is the raw electron/s 
+                self.std['invsens_data'] = hdu[0].data[0]
+                self.std['invsens_model_drp'] = hdu[0].data[1]
+                self.std['counts'] = hdu[0].data[2]
+                self.std['name'] = hdr['OBJECT'].lower()
+                self.std['invsens_model'] = hdu[0].data[3]
+                self.std['flag'] = hdu[0].data[4]
+                if len(hdu[0].data) > 5:
+                    self.std['tellmodel'] = hdu[0].data[5]
+                else:
+                    self.std['tellmodel'] = None
+                self.std['frame'] = re.sub('_invsens_updated.fits', '', os.path.basename(self.std_entry.get()))
 
 
 
-        #setup the B-Spline fit parameters
-        self.std['bspline_bkpt'] = 150 #breakpoints
-        self.std['bspline_polyorder'] = 3 #polynomial order between interval
-        
-        self.insert_text(f"[INFO] Loading the {self.std_entry.get()}")
+            #setup the B-Spline fit parameters
+            self.std['bspline_bkpt'] = 150 #breakpoints
+            self.std['bspline_polyorder'] = 3 #polynomial order between interval
+            
+            self.insert_text(f"[INFO] Loading the {self.std_entry.get()}")
 
 
-        #load the flux-calibrated spec for comparison
-        try:
-            std = fits.getdata('{0}/{1}.fits'.format(self.stddir, self.std['name']))
-        except ValueError:
-            self.insert_text(f"Cannot find the std spec for {self.std_name} in {self.stddir}")
+            #load the flux-calibrated spec for comparison
+            try:
+                std = fits.getdata('{0}/{1}.fits'.format(self.stddir, self.std['name']))
+            except ValueError:
+                self.insert_text(f"Cannot find the std spec for {self.std_name} in {self.stddir}")
 
-        use = np.where((std['WAVELENGTH'] >= hdr['WAVGOOD0'] - 5) & (std['WAVELENGTH'] <= hdr['WAVGOOD1'] + 5))[0] #only load the spectrum in the good wavelength region
-        self.std['spec_calib'] = np.column_stack((std['WAVELENGTH'][use], std['FLUX'][use]))
+            use = np.where((std['WAVELENGTH'] >= hdr['WAVGOOD0'] - 5) & (std['WAVELENGTH'] <= hdr['WAVGOOD1'] + 5))[0] #only load the spectrum in the good wavelength region
+            self.std['spec_calib'] = np.column_stack((std['WAVELENGTH'][use], std['FLUX'][use]))
 
-        # self.std['flag'] = self.mask_skyline_region(self.std['wave']) #flag indicated if a region is masked out
-        # self.std['use_ind'] = np.array([], dtype = int) #a list of indices for the single points used for fitting
-        #Initialize the region for later interactive selection
+            # self.std['flag'] = self.mask_skyline_region(self.std['wave']) #flag indicated if a region is masked out
+            # self.std['use_ind'] = np.array([], dtype = int) #a list of indices for the single points used for fitting
+            #Initialize the region for later interactive selection
 
-        self.std['region_start'] = None
-        self.std['region_end'] = None
+            self.std['region_start'] = None
+            self.std['region_end'] = None
 
-        #set the focuse to the canvas page
-        self.canvas.get_tk_widget().focus_set()
+            #set the focuse to the canvas page
+            self.canvas.get_tk_widget().focus_set()
 
-        self.plot_std()
-        inst = ("[INSTRUCTION] Press 'i' twice on each side of the region you want to include in the fit;"
-                "press 'e' twice on each side of the region you want to exclude from the fit;"
-                "press 'a' on the single data point you want to include in the fit;"
-                "and press 'd' on the data point you want to exclude from the fit. "
-                "First, to fit the sensitive function, press 'f'. Second, 'press' t to fit the telluric model [this may take a while]")
-        self.insert_text(inst)
+            self.plot_std()
+            inst = ("[INSTRUCTION] Press 'i' twice on each side of the region you want to include in the fit;"
+                    "press 'e' twice on each side of the region you want to exclude from the fit;"
+                    "press 'a' on the single data point you want to include in the fit;"
+                    "and press 'd' on the data point you want to exclude from the fit. "
+                    "First, to fit the sensitive function, press 'f'. Second, 'press' t to fit the telluric model [this may take a while]")
+            self.insert_text(inst)
 
     def save_updated_invsens(self):
 
