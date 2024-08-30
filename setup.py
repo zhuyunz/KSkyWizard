@@ -24,23 +24,27 @@ entry_points = {
     ]}
 
 setuptools.setup(name=NAME,
-      provides=NAME,
-      version=VERSION,
-      license=LICENSE,
-      description=DESCRIPTION,
-      long_description=open('README.md').read(),
-      author=AUTHOR,
-      author_email=AUTHOR_EMAIL,
-      packages=setuptools.find_packages(),
-      package_data={'': ['data/extin/*', 'data/stds/*']},
-      entry_points=entry_points,
-      install_requires=[
+    python_requires='>3.10',
+    provides=NAME,
+    version=VERSION,
+    license=LICENSE,
+    description=DESCRIPTION,
+    long_description=open('README.md').read(),
+    author=AUTHOR,
+    author_email=AUTHOR_EMAIL,
+    packages=setuptools.find_packages(),
+    package_data={'': ['data/extin/*', 'data/stds/*']},
+    entry_points=entry_points,
+    install_requires=[
         'astropy',
         'argparse',
         'matplotlib',
         'numpy',
-        'PyQt5',
-        'scipy']
+        'tk',
+        'scipy',
+        'ref_index',
+        'pyregion',
+        'pypeit~=1.16']
 )
 
 

@@ -201,3 +201,30 @@ def atm_disper(w0, w1, airmass, temperature=10.0, pressure_pa=61100.0,
                           rh=humidity, co2=co2)
 
     return 206265.0 * (n0 - n1) * math.tan(z)
+
+def collapse_header(hdr):
+    """
+    Quick wrapper to collapse a 3-D header into a 2-D one.
+    Copied from KCWIKit
+
+    Parameters
+    ----------
+    hdr: header
+
+    Returns
+    -------
+    hdr_img: collapsed header
+
+    """
+
+    hdr_img=hdr.copy()
+    hdr_img['NAXIS']=2
+    del hdr_img['NAXIS3']
+    del hdr_img['CD3_3']
+    del hdr_img['CTYPE3']
+    del hdr_img['CUNIT3']
+    del hdr_img['CNAME3']
+    del hdr_img['CRVAL3']
+    del hdr_img['CRPIX3']
+
+    return hdr_img

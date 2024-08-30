@@ -19,8 +19,6 @@ from astropy.io import fits
 from astropy.table import Table
 from astropy.stats import sigma_clip
 import os 
-sys.path.insert(1, '/Users/yuguangchen/Softs/KCWIKit/KcwiKit/py/')
-import kcwi_tools 
 import pyregion
 import re
 from scipy.interpolate import interp1d, splrep, splev
@@ -624,7 +622,7 @@ class KCWIViewerApp:
                 #white-lighted image
                 wlimg_index = np.where((self.obswave >= self.wlimg_wave_range[0]) & (self.obswave <= self.wlimg_wave_range[1]))[0]
                 wlimg = np.sum(hdu[0].data[wlimg_index], axis = 0)
-                hdr2d = kcwi_tools.collapse_header(self.scihdu[0].header)
+                hdr2d = collapse_header(self.scihdu[0].header)
                 wlhdu = fits.PrimaryHDU(wlimg, header = hdr2d)
                 mask = np.mean(self.scihdu['FLAGS'].data, axis = 0)
                 mhdu = fits.ImageHDU(mask, header = hdr2d)
@@ -1236,7 +1234,7 @@ class KCWIViewerApp:
         #save the white-lighted image of the clean cube
         wlimg_index = np.where((self.obswave >= self.wlimg_wave_range[0]) & (self.obswave <= self.wlimg_wave_range[1]))[0]
         wlimg = np.sum(self.cleanhdu_flux[0].data, axis = 0)
-        hdr2d = kcwi_tools.collapse_header(self.cleanhdu_flux[0].header)
+        hdr2d = collapse_header(self.cleanhdu_flux[0].header)
         wlhdu = fits.PrimaryHDU(wlimg, header = hdr2d)
         wlhdu.header['WAVWLIMG0'] = self.wlimg_wave_range[0]
         wlhdu.header['WAVWLIMG1'] = self.wlimg_wave_range[1]
@@ -1747,11 +1745,13 @@ def run_command(command: List[str], text_box: tk.Text):
     thread.start()
     proc.wait()
 
-
-if __name__ == "__main__":
+def main():
     root = tk.Tk()
     root.geometry("1200x800")
     root.resizable(True, True)
     app = KCWIViewerApp(root)
     root.bind("<FocusIn>", app.focus_in)
     root.mainloop()
+
+if __name__ == "__main__":
+    main()
