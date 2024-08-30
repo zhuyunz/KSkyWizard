@@ -2,6 +2,7 @@ from pypeit.par import pypeitpar
 from pypeit.core import telluric
 from pypeit.spectrographs.util import load_spectrograph
 import zap
+import os
 
 def telluric_correct(infile_path: str,  star_ra: float, star_dec: float, 
                      spectrograph = 'keck_kcrm'):
@@ -228,3 +229,9 @@ def collapse_header(hdr):
     del hdr_img['CRPIX3']
 
     return hdr_img
+
+def check_dir(dir):
+    if not os.path.isdir(dir):
+        os.mkdir(dir)
+
+    return

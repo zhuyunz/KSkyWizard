@@ -51,11 +51,11 @@ This version is still under development. If you run into any issue, please drop 
 ####Some user-defined setup. People should update it based on their own needs######
 #only set it for test purporse. When it browse the directory, it will start from your favorite directory storing the data :)
 # initial_dir = '/scr/zzhuang/keck_obs/kcwi'
-initial_dir = '/Volumes/obs-data/obs/2024feb11/kred_test/redux'
+initial_dir = os.getcwd()
 
 #Set it to the place where you put the TelFit file from pypeit. Can download it via "pypeit_install_telluric TelFit_MaunaKea_3100_26100_R20000.fits"
 #Please do not download the TelPCA file (the default of Pypeit). The updated TelPCA file would cause weird shape in the telluric model so please stick to TelFit_MaunaKea!
-telgridfile = '/Users/yuguangchen/.pypeit/cache/download/url/5f17ecc1fcc921d6ec01e18d931ec2f8/content'
+#telgridfile = '/Users/yuguangchen/.pypeit/cache/download/url/5f17ecc1fcc921d6ec01e18d931ec2f8/content'
 
 #pick this region to generate the white-lighted image because sky lines are much stronger elsewhere. 
 # TODO: Can also make it as an input or variable parameter in the GUI
@@ -96,6 +96,7 @@ class KCWIViewerApp:
         self.input_dir_label = tk.Label(self.input_frame, text="Input Directory:")
         self.input_dir_label.grid(row=0, column=0, sticky='ew')
         self.input_dir_entry = tk.Entry(self.input_frame)
+        self.input_dir_entry.insert(0, initial_dir)
         self.input_dir_entry.grid(row=0, column=1, sticky='ew')
         self.browse_button = tk.Button(self.input_frame, text="Browse", command=self.browse_input_directory)
         self.browse_button.grid(row=0, column=2, sticky='ew')
@@ -107,6 +108,8 @@ class KCWIViewerApp:
         self.output_dir_label = tk.Label(self.output_frame, text="Output Directory:")
         self.output_dir_label.grid(row=0, column=0, sticky='ew')
         self.output_dir_entry = tk.Entry(self.output_frame)
+        self.output_dir_entry.insert(0, os.path.join(initial_dir, 'kskywizard'))
+        self.output = self.output_dir_entry.get()
         self.output_dir_entry.grid(row=0, column=1, sticky='ew')
         self.browse_button = tk.Button(self.output_frame, text="Browse", command=self.browse_output_directory)
         self.browse_button.grid(row=0, column=2, sticky='ew')
@@ -500,22 +503,30 @@ class KCWIViewerApp:
 
         #specify the input directory
         directory = filedialog.askdirectory(initialdir=initial_dir)
-        self.input_dir_entry.delete(0, tk.END)
-        self.input_dir_entry.insert(tk.END, directory)
-        self.base = self.input_dir_entry.get()
-        self.insert_text(f"[INFO] Loading the data from {self.base}")
 
-        #find the common string name for a given date
-        self.prefix = os.path.basename(glob(f'{directory}/k*.fits')[0])[:8]
+        # Check if the directory is not empty (i.e., the user didn't click "Cancel")
+        if directory:
+            self.input_dir_entry.delete(0, tk.END)
+            self.input_dir_entry.insert(tk.END, directory)
+            self.base = self.input_dir_entry.get()
+            self.insert_text(f"[INFO] Loading the data from {self.base}")
+
+            # Find the common string name for a given date
+            try:
+                self.prefix = os.path.basename(glob(f'{directory}/k*.fits')[0])[:8]
+            except IndexError:
+                self.prefix = None
 
     def browse_output_directory(self):
         """Select the output directory"""
-        directory = filedialog.askdirectory()
-        self.output_dir_entry.delete(0, tk.END)
-        self.output_dir_entry.insert(tk.END, directory)
-        self.output = self.output_dir_entry.get()
-        # print(f'[INFO] Set the output directory to {self.output}')
-        self.insert_text(f"[INFO] Set the output directory to {self.output}")
+        directory = filedialog.askdirectory(initialdir=initial_dir)
+
+        if directory:    
+            self.output_dir_entry.delete(0, tk.END)
+            self.output_dir_entry.insert(tk.END, directory)
+            self.output = self.output_dir_entry.get()
+            # print(f'[INFO] Set the output directory to {self.output}')
+            self.insert_text(f"[INFO] Set the output directory to {self.output}")
 
     def load_data(self, datatype):
         """
@@ -630,6 +641,7 @@ class KCWIViewerApp:
                 mask = np.mean(self.scihdu['FLAGS'].data, axis = 0)
                 mhdu = fits.ImageHDU(mask, header = hdr2d)
                 hdulist = fits.HDUList([wlhdu, mhdu])
+                check_dir(self.output)
                 hdulist.writeto(f'{self.output}/{self.prefix}_{index:05d}_wlimg.fits', overwrite = True)
 
                 #preliminary ZAP mask - only for the sky cube
@@ -1394,6 +1406,7 @@ class KCWIViewerApp:
             if not confirm:
                 return
         self.insert_text(f"[INFO] Saving the updated invsens file to {frame}_invsens_updated.fits")
+        check_dir(os.path.dirname(filename))
         newhdu.writeto(filename, overwrite = True)
         
 
