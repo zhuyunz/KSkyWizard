@@ -11,6 +11,7 @@ import sys
 import subprocess
 import threading
 from glob import glob
+import pkg_resources
 
 
 #package for astro analyis
@@ -132,7 +133,8 @@ class KCWIViewerApp:
         
         ###### tab 1 #####
         ############# Setup the flux calibration part for stds ###############
-        self.stddir = re.sub('py/kcwi_tools.py', 'data/stds', kcwi_tools.__file__)  #the base directory to read in the flux-calibrated spectrum of a given std
+        #self.stddir = re.sub('py/kcwi_tools.py', 'data/stds', kcwi_tools.__file__)  #the base directory to read in the flux-calibrated spectrum of a given std
+        self.stddir = pkg_resources.resource_filename(__name__, 'data/stds')
         self.std_index_label = tk.Label(self.tab1, text="Standard star invsens (DRP): ")
         self.std_index_label.grid(row = 1, column = 0, sticky='ew')
         self.std_entry = tk.Entry(self.tab1)
@@ -327,7 +329,8 @@ class KCWIViewerApp:
 
 
         #read in the line table
-        self.line_tbl = Table.read(re.sub('py/kcwi_tools.py', 'data/lines.dat', kcwi_tools.__file__), format = 'csv')
+        line_list_fn = pkg_resources.resource_filename(__name__, 'data/lines.dat')
+        self.line_tbl = Table.read(line_list_fn, format = 'csv')
 
     def insert_text(self, text, newline = True, color="black"):
 
