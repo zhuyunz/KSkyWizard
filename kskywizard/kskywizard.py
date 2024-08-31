@@ -55,7 +55,7 @@ initial_dir = os.getcwd()
 
 #Set it to the place where you put the TelFit file from pypeit. Can download it via "pypeit_install_telluric TelFit_MaunaKea_3100_26100_R20000.fits"
 #Please do not download the TelPCA file (the default of Pypeit). The updated TelPCA file would cause weird shape in the telluric model so please stick to TelFit_MaunaKea!
-#telgridfile = '/Users/yuguangchen/.pypeit/cache/download/url/5f17ecc1fcc921d6ec01e18d931ec2f8/content'
+telgridfile = '/Users/yuguangchen/.pypeit/cache/download/url/5f17ecc1fcc921d6ec01e18d931ec2f8/content'
 
 #pick this region to generate the white-lighted image because sky lines are much stronger elsewhere. 
 # TODO: Can also make it as an input or variable parameter in the GUI
@@ -96,7 +96,7 @@ class KCWIViewerApp:
         self.input_frame = tk.Frame(root)
         self.input_frame.grid(row=0, column=0, columnspan=3, sticky='nsew', padx=5, pady=5)
 
-        self.input_dir_label = tk.Label(self.input_frame, text="Input Directory:")
+        self.input_dir_label = tk.Label(self.input_frame, text="Input Directory:", anchor='e')
         self.input_dir_label.grid(row=0, column=0, sticky='ew')
         self.input_dir_entry = tk.Entry(self.input_frame)
         self.input_dir_entry.insert(0, initial_dir)
@@ -108,7 +108,7 @@ class KCWIViewerApp:
         self.output_frame = tk.Frame(root)
         self.output_frame.grid(row=0, column=3, columnspan=3, sticky='nsew', padx=5, pady=5)
 
-        self.output_dir_label = tk.Label(self.output_frame, text="Output Directory:")
+        self.output_dir_label = tk.Label(self.output_frame, text="Output Directory:", anchor='e')
         self.output_dir_label.grid(row=0, column=0, sticky='ew')
         self.output_dir_entry = tk.Entry(self.output_frame)
         self.output_dir_entry.insert(0, os.path.join(initial_dir, 'kskywizard'))
@@ -141,7 +141,7 @@ class KCWIViewerApp:
         ############# Setup the flux calibration part for stds ###############
         #self.stddir = re.sub('py/kcwi_tools.py', 'data/stds', kcwi_tools.__file__)  #the base directory to read in the flux-calibrated spectrum of a given std
         self.stddir = pkg_resources.resource_filename(__name__, 'data/stds')
-        self.std_index_label = tk.Label(self.tab1, text="Standard star invsens (DRP): ")
+        self.std_index_label = tk.Label(self.tab1, text="Standard star invsens (DRP): ", anchor='e')
         self.std_index_label.grid(row = 1, column = 0, sticky='ew')
         self.std_entry = tk.Entry(self.tab1)
         self.std_entry.grid(row = 1, column = 1, sticky='ew')
