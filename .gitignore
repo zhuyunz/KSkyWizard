@@ -6,7 +6,7 @@
 *.egg-info*
 
 # comment out if there are real changes
-setup.cfg
+*setup.cfg*
 
 # Icon must end with two \r
 Icon
