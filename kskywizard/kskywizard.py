@@ -679,6 +679,7 @@ class KCWIViewerApp:
                 self.insert_text(f"[INFO] Saving the cropped datacube for {self.prefix}_{index:05d}")
 
                 #cropped datacube
+                check_dir(self.output)
                 hdu.writeto(f'{self.output}/{self.prefix}_{index:05d}_{self.ctype}.fits', overwrite = True)
 
                 #white-lighted image
@@ -689,7 +690,6 @@ class KCWIViewerApp:
                 mask = np.mean(self.scihdu['FLAGS'].data, axis = 0)
                 mhdu = fits.ImageHDU(mask, header = hdr2d)
                 hdulist = fits.HDUList([wlhdu, mhdu])
-                check_dir(self.output)
                 hdulist.writeto(f'{self.output}/{self.prefix}_{index:05d}_wlimg.fits', overwrite = True)
 
                 #preliminary ZAP mask - only for the sky cube
@@ -733,6 +733,7 @@ class KCWIViewerApp:
                 if not confirm:
                     return
             self.insert_text(f"[INFO] Saving ZAP mask to {self.prefix}_{self.mindex:05d}_zap_mask.fits")
+            check_dir(os.path.dirname(filename))
             maskhdu.writeto(filename, overwrite = True)
 
     
@@ -1070,6 +1071,7 @@ class KCWIViewerApp:
         skyhdu = fits.ImageHDU(data=skycube, header=self.scihdu[0].header)
         skyhdu.name = 'SKYMODEL_ZAP'
         self.cleanhdu.append(skyhdu)
+        check_dir(self.output)
         self.cleanhdu.writeto(f'{self.output}/{self.prefix}_{self.index:05d}_zap_{self.ctype}.fits', overwrite = True)
 
         #Need to run the DAR correction for the unrectified cube
@@ -1243,6 +1245,7 @@ class KCWIViewerApp:
 
             self.cleanhdu[0].header = self.scihdr
 
+            check_dir(self.output)
             self.cleanhdu.writeto(f'{self.output}/{self.prefix}_{self.index:05d}_zap_icubed.fits', overwrite = True)
 
                     
@@ -1291,6 +1294,7 @@ class KCWIViewerApp:
                 pass
 
             #write the new cubes
+            check_dir(self.output)
             self.cleanhdu_flux.writeto(f'{self.output}/{self.prefix}_{self.index:05d}_zap_icubes.fits', overwrite = True)
                 
 
@@ -1304,6 +1308,7 @@ class KCWIViewerApp:
         mask = np.mean(self.cleanhdu_flux['FLAGS'].data, axis = 0)
         mhdu = fits.ImageHDU(mask, header = hdr2d)
         hdulist = fits.HDUList([wlhdu, mhdu])
+        check_dir(self.output)
         hdulist.writeto(f'{self.output}/{self.prefix}_{self.index:05d}_zapclean_wlimg.fits', overwrite = True)
 
         #TODO make the errcube_combined as the official cleanhdu_flux['UNCERT'].data
@@ -1588,7 +1593,8 @@ class KCWIViewerApp:
             hdulist[1].header[k] = keys_1[k]
         for k in keys_2.keys():
             hdulist[0].header[k] = keys_2[k]
-        std_spec1d_path = f'{self.output}/{frame}_standard_spec1d.fits'
+        std_spec1d_path = os.path.join(self.output, f'{frame}_standard_spec1d.fits')
+        check_dir(self.output)
         hdulist.writeto(f'{std_spec1d_path}', overwrite = True)
 
         #Generate the pypeit input file

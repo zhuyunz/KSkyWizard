@@ -3,6 +3,12 @@ from pypeit.core import telluric
 from pypeit.spectrographs.util import load_spectrograph
 import zap
 import os
+import re
+from astropy.io import fits
+import math
+import ref_index
+
+telgridfile = '/Users/yuguangchen/.pypeit/cache/download/url/5f17ecc1fcc921d6ec01e18d931ec2f8/content'
 
 def telluric_correct(infile_path: str,  star_ra: float, star_dec: float, 
                      spectrograph = 'keck_kcrm'):
