@@ -7,8 +7,30 @@ import re
 from astropy.io import fits
 import math
 import ref_index
+try:
+    from ConfigParser import ConfigParser
+except ImportError:
+    from configparser import ConfigParser
 
-telgridfile = '/Users/yuguangchen/.pypeit/cache/download/url/5f17ecc1fcc921d6ec01e18d931ec2f8/content'
+def read_setup_cfg(section, key):
+    config = ConfigParser()
+
+    # Get the directory where this script resides
+    setup_cfg_path = os.path.join(os.path.dirname(__file__), '..', 'setup.cfg')
+
+    # Read the setup.cfg file
+    config.read(setup_cfg_path)
+
+    # Access the value in custom_section
+    my_value = config.get(section, key)
+
+    return my_value
+
+telgridfile = read_setup_cfg('telluric', 'telgridfile')
+try:
+    fits.open(telgridfile)
+except:
+    raise ValueError(f"Telgrid file: '{telgridfile}', in 'setup.py' does not exist.")
 
 def telluric_correct(infile_path: str,  star_ra: float, star_dec: float, 
                      spectrograph = 'keck_kcrm'):
@@ -38,6 +60,9 @@ def telluric_correct(infile_path: str,  star_ra: float, star_dec: float,
     # Parse the output filename
     outfile = re.sub('.fits', '_tellcorr.fits', infile_path)
     modelfile = re.sub('.fits', '_tellmodel.fits', infile_path)
+
+    #import pickle
+    #pickle.dump((infile_path, par, modelfile, outfile), open('tmp.pickle', 'wb'))
 
     try:
         TelStar = telluric.star_telluric(infile_path, par['telluric']['telgridfile'],
