@@ -372,12 +372,42 @@ class KCWIViewerApp:
         else:
             self.index2_entry.delete(0, tk.END)
 
+    def get_file_prefix_index(self, input):
+        # extract the prefix and index from the input string
+
+        # if input is a number
+        try:
+            self.index = int(input)
+            number_flag=True
+        except:
+            number_flag = False
+        
+        if number_flag:
+            # Find the common string name for a given date
+            try:
+                self.prefix = os.path.basename(glob(f'{self.base}/k*.fits')[0])[:8]
+            except:
+                self.prefix = None
+                raise ValueError(f'No KCWI file found in {self.base}')
+            
+            filename = os.path.join(self.base, f'{self.prefix}_{self.index:05d}.fits')
+            if not os.path.isfile(filename):
+                raise IndexError(f"File name {filename} not found. Try specify the full filename.")
+        else:
+            # input is a string of basename or full filename
+            try:
+                self.prefix = os.path.basename(input)[:8]
+                self.index = int(os.path.basename(input)[9:14])
+            except:
+                raise ValueError('Failed to load science file. Check the input frame number.')
+
+
     def increase_index(self):
         """"Increase the science frame number"""
         self.index += 1
         # self.update_index_entries()
         self.index_entry.delete(0, tk.END)
-        self.index_entry.insert(tk.END, str(self.index))
+        self.index_entry.insert(tk.END, f'{self.prefix}_{self.index:05d}')
         self.insert_text(f"[INFO] Set the science frame: {self.prefix}_{self.index:05d}")
 
         #drop the attribute "zap" to reinitialize the ZAP configuration
@@ -388,7 +418,7 @@ class KCWIViewerApp:
         self.index = max(0, self.index - 1)
         # self.update_index_entries()
         self.index_entry.delete(0, tk.END)
-        self.index_entry.insert(tk.END, str(self.index))
+        self.index_entry.insert(tk.END, f'{self.prefix}_{self.index:05d}')
         self.insert_text(f"[INFO] Set the science frame: {self.prefix}_{self.index:05d}")
 
         #drop the attribute "zap" to reinitialize the ZAP configuration
@@ -398,7 +428,7 @@ class KCWIViewerApp:
         #if update the science frame number
         if self.last_focused_entry == self.index_entry and self.index > 0:
             self.index_entry.delete(0, tk.END)
-            self.index_entry.insert(tk.END, str(self.index))
+            self.index_entry.insert(tk.END, f'{self.prefix}_{self.index:05d}')
             self.insert_text(f"[INFO] Set the science frame: {self.prefix}_{self.index:05d}")
             # self.index_entry.selection_clear()
 
@@ -435,7 +465,7 @@ class KCWIViewerApp:
 
     def update_index(self, event):
         try:
-            self.index = int(self.index_entry.get())
+            self.get_file_prefix_index(self.index_entry.get())
 
             #drop the attribute "zap" to reinitialize the ZAP configuration
             self.zap = {}
@@ -566,6 +596,7 @@ class KCWIViewerApp:
 
         #specify the input directory
         directory = filedialog.askdirectory(initialdir=initial_dir)
+        self.base = directory
 
         # Check if the directory is not empty (i.e., the user didn't click "Cancel")
         if directory:
@@ -575,10 +606,10 @@ class KCWIViewerApp:
             self.insert_text(f"[INFO] Loading the data from {self.base}")
 
             # Find the common string name for a given date
-            try:
-                self.prefix = os.path.basename(glob(f'{directory}/k*.fits')[0])[:8]
-            except IndexError:
-                self.prefix = None
+            #try:
+            #    self.prefix = os.path.basename(glob(f'{directory}/k*.fits')[0])[:8]
+            #except IndexError:
+            #    self.prefix = None
 
     def browse_output_directory(self):
         """Select the output directory"""
