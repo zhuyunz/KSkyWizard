@@ -1821,10 +1821,30 @@ def run_command(command: List[str], text_box: tk.Text):
     thread.start()
     proc.wait()
 
+def center_window(root):
+    """Center the window on the screen"""
+    root.update_idletasks()  # Update "requested size" from geometry manager
+
+    # Get the window's dimensions
+    width = root.winfo_width()
+    height = root.winfo_height()
+
+    # Get the screen's dimensions
+    screen_width = root.winfo_screenwidth()
+    screen_height = root.winfo_screenheight()
+
+    # Calculate the position to center the window
+    x = (screen_width // 2) - (width // 2)
+    y = (screen_height // 2) - (height // 2)
+
+    # Set the geometry of the window to center it
+    root.geometry(f'{width}x{height}+{x}+{y}')
+
 def main():
     root = tk.Tk()
     root.geometry("1200x800")
     root.resizable(True, True)
+    center_window(root)
     app = KCWIViewerApp(root)
     root.bind("<FocusIn>", app.focus_in)
     root.mainloop()
