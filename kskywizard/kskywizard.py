@@ -842,7 +842,7 @@ class KCWIViewerApp:
 
             self.ax.step(self.obswave / (1+z), skyspec, color ='lightskyblue', lw = 1, label = label, alpha = 0.5)
         self.ax.legend()
-        self.ax.set_title(self.scihdr['OFNAME'] + f'  - {self.objname}')
+        self.ax.set_title(self.scihdr['OFNAME'] + f' - {self.objname} - ' + self.scihdr['STATENAM'])
         # self.figure.tight_layout()
         if np.abs(z) < 1e-10:
             self.ax.set_xlabel('Obs. Wavelength [A]')
