@@ -165,21 +165,22 @@ class KCWIViewerApp:
 
         ######## tab 2 #############
         ############# Science index input############
-        self.index_label = tk.Label(self.tab2, text="Science Frame No.:")
+        self.index_label = tk.Label(self.tab2, text="Science Frame No.:", anchor='e')
         self.index_label.grid(row=2, column=0, sticky='ew')
         self.index_entry = tk.Entry(self.tab2)
         self.index_entry.grid(row=2, column=1, sticky='ew')
         self.index_entry.bind("<Return>", self.update_index)
 
         ############# Buttons for increasing and decreasing index for science frame############
-        self.increase_button = tk.Button(self.tab2, text="Previous", command=self.decrease_index)
+        self.increase_button = tk.Button(self.tab2, text="<--Previous", command=self.decrease_index)
         self.increase_button.grid(row=2, column=2, sticky='ew')
-        self.decrease_button = tk.Button(self.tab2, text="Next", command=self.increase_index)
+
+        self.decrease_button = tk.Button(self.tab2, text="Next-->", command=self.increase_index)
         self.decrease_button.grid(row=2, column=3, sticky='ew')
 
         #############Check box to select whether an off-field sky is used############
         self.use_index2_var = tk.BooleanVar()
-        self.use_index2_checkbox = tk.Checkbutton(self.tab2, text="Use Off-field Sky Frame No.", variable=self.use_index2_var, command=self.toggle_index2_entry)
+        self.use_index2_checkbox = tk.Checkbutton(self.tab2, text="Use Off-field Sky Frame No.", variable=self.use_index2_var, command=self.toggle_index2_entry, anchor='w')
         self.use_index2_checkbox.grid(row=2, column=4, sticky='ew')
 
         ############# sky index input############
@@ -198,7 +199,7 @@ class KCWIViewerApp:
 
 
         #############  Load raw data (DRP-reduced cube) button############
-        self.load_button = tk.Button(self.tab2, text="Load Raw Cube", command=lambda: self.load_data('raw'))
+        self.load_button = tk.Button(self.tab2, text="Load DRP Cube", command=lambda: self.load_data('raw'))
         self.load_button.grid(row=3, column=1, sticky='ew')
 
         #############  Save cropped data (good wavelength region) button############
@@ -210,7 +211,7 @@ class KCWIViewerApp:
         self.load_crop_button.grid(row=3, column=3, sticky='ew')
 
         ############# input the redshift of a given source #########
-        self.redshift_label = tk.Label(self.tab2, text = 'Redshift:')
+        self.redshift_label = tk.Label(self.tab2, text = 'Redshift:', anchor='e')
         self.redshift_label.grid(row = 3, column =4, sticky='ew')
         self.redshift_entry = tk.Entry(self.tab2)
         self.redshift_entry.grid(row = 3, column = 5, sticky='ew')
@@ -219,7 +220,7 @@ class KCWIViewerApp:
 
         ############# Input the mask frame No. (can be different from the science one since we usally take the at least three frames) ############
         # This function is only used for convenience, so that for each pair we only need to create one 
-        self.mask_index_label = tk.Label(self.tab2, text="ZAP Mask Frame No.:")
+        self.mask_index_label = tk.Label(self.tab2, text="ZAP Mask Frame No.:", anchor='e')
         self.mask_index_label.grid(row=4, column=0, sticky='ew')
         self.mask_entry = tk.Entry(self.tab2)
         self.mask_entry.grid(row = 4, column=1, sticky='ew')
@@ -230,12 +231,12 @@ class KCWIViewerApp:
         #############Check box to select whether multiple skysegment used, and whether have an additional sky seg near Halpha############
         self.use_multi_skyseg = tk.BooleanVar()
         self.use_multi_skyseg_checkbox = tk.Checkbutton(self.tab2, text="Use multiple skyseg in ZAP", variable=self.use_multi_skyseg, 
-                                                        onvalue = True, offvalue = False)
+                                                        onvalue = True, offvalue = False, anchor='w')
         self.use_multi_skyseg_checkbox.grid(row=4, column=3, sticky='ew')
         self.use_multi_skyseg.set(True)
         self.use_Ha_seg = tk.BooleanVar()
         self.use_Ha_seg_checkbox = tk.Checkbutton(self.tab2, text='Additional Sky Seg near Halpha', variable=self.use_Ha_seg,
-                                                  onvalue = True, offvalue = False)
+                                                  onvalue = True, offvalue = False, anchor='w')
         self.use_Ha_seg_checkbox.grid(row = 4, column = 4, sticky='ew')
         self.use_Ha_seg.set(True)
 
