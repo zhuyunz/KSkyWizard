@@ -1348,7 +1348,7 @@ class KCWIViewerApp:
             #    filetypes=(("DRP invsens files", "*.*invsens.fits"), ("All files", '*.*')))
             filename = self.open_glob_file(initialdir=self.base, ext='*_invsens.fits')
         else:
-            filename = self.open_glob_file(initialdir=self.output, ext='*_invsens_update.fits')
+            filename = self.open_glob_file(initialdir=self.output, ext='*_invsens_updated.fits')
         # filename = '/scr/zzhuang/keck_obs/kcwi/2023sep23/red/redux/kr230923_00174_invsens.fits' #for test purpose only
         if filename:
             self.std_entry.delete(0, tk.END)
@@ -1380,6 +1380,7 @@ class KCWIViewerApp:
                 #sens func and telluric model to be updated
                 self.std['invsens_model'] = None
                 self.std['tellmodel'] = None
+                self.std['statenam'] = hdr['statenam']
 
             #the updated version, so no need to crop the data
             elif type == 'updated':
@@ -1396,6 +1397,7 @@ class KCWIViewerApp:
                 else:
                     self.std['tellmodel'] = None
                 self.std['frame'] = re.sub('_invsens_updated.fits', '', os.path.basename(self.std_entry.get()))
+                self.std['statenam'] = hdr['statenam']
 
 
 
@@ -1479,8 +1481,8 @@ class KCWIViewerApp:
          #plot the flux-calibrated spec
         self.ax.clear()
         self.ax.step(self.std['wave'], self.std['counts'] * self.std['invsens_model_drp'], 
-                        color = 'r', lw =1, label = 'best-fit model from DRP', where = 'mid', alpha = 0.5) #raw count x invsens = flux-calibrated spec
-        self.ax.plot(self.std['spec_calib'][:,0], self.std['spec_calib'][:,1], color = 'k', label = 'flux-calibrated spec of std')
+                        color = 'r', lw =1, label = 'Flux calibrated spec (DRP)', where = 'mid', alpha = 0.5) #raw count x invsens = flux-calibrated spec
+        self.ax.plot(self.std['spec_calib'][:,0], self.std['spec_calib'][:,1], color = 'k', label = 'Standard star template')
 
 
         use_region = np.where(self.std['flag'] == 1)[0]
@@ -1489,29 +1491,29 @@ class KCWIViewerApp:
         #plot the updated flux-calibrated model
         if self.std['invsens_model'] is not None:
             self.ax.step(self.std['wave'], self.std['counts'] * self.std['invsens_model'], color = 'cyan', 
-                         lw =1, label = 'best-fit new model', where = 'mid') #raw count x invsens = flux-calibrated spec
+                         lw =1, label = 'Flux calibrated spec (refit) ', where = 'mid') #raw count x invsens = flux-calibrated spec
             self.ax.plot(self.std['wave'][use_region], (self.std['counts'] * self.std['invsens_model'])[use_region], 'x', 
-                        color = 'lightgreen', ms = 5, label = 'selected for fitting') #selected regions 
+                        color = 'lightgreen', ms = 5, label = 'Selected for fitting') #selected regions 
             if len(use_point) > 0:
                 self.ax.plot(self.std['wave'][use_point], (self.std['counts'] * self.std['invsens_model'])[use_point], 'o', 
-                            color = 'darkgreen', ms = 10, label = 'selected for fitting') #selected pixels 
+                            color = 'darkgreen', ms = 10, label = 'Selected for fitting') #selected pixels 
 
              #plot the telluric-corrected model
             if self.std['tellmodel'] is not None:
                 telluric = self.std['tellmodel']**(self.std['invsens_hdr']['AIRMASS']) #convert the model at AM=1.0 to the real AM
                 self.ax.step(self.std['wave'], self.std['counts'] * self.std['invsens_model'] / telluric, color = 'royalblue',
-                            where = 'mid', lw = 1, label = 'telluric-corrected std spec')
+                            where = 'mid', lw = 1, label = 'Telluric corrected, flux calibrated spec')
         
         #plot the DRP-reduced flux-calibrated model
         else:
             self.ax.plot(self.std['wave'][use_region], (self.std['counts'] * self.std['invsens_model_drp'])[use_region], 'x', 
-                    color = 'lightgreen', ms = 5, label = 'selected for fitting') #selected regions 
+                    color = 'lightgreen', ms = 5, label = 'Selected for fitting') #selected regions 
             if len(use_point) > 0:
                 self.ax.plot(self.std['wave'][use_point], (self.std['counts'] * self.std['invsens_model_drp'])[use_point], 'o', 
-                            color = 'darkgreen', ms = 10, label = 'selected for fitting') #selected pixels 
+                            color = 'darkgreen', ms = 10, label = 'Selected for fitting') #selected pixels 
 
 
-        self.ax.set_title('%s - %s'%(self.std['frame'], self.std['name']))
+        self.ax.set_title('{0} - {1} - {2}'.format(self.std['frame'], self.std['name'], self.std['statenam']))
         self.ax.set_xlabel('Obs. Wavelength [A]')
         self.ax.set_ylabel('flam [erg/s/cm2/A]')
         self.ax.legend()

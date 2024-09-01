@@ -61,9 +61,6 @@ def telluric_correct(infile_path: str,  star_ra: float, star_dec: float,
     outfile = re.sub('.fits', '_tellcorr.fits', infile_path)
     modelfile = re.sub('.fits', '_tellmodel.fits', infile_path)
 
-    #import pickle
-    #pickle.dump((infile_path, par, modelfile, outfile), open('tmp.pickle', 'wb'))
-
     try:
         TelStar = telluric.star_telluric(infile_path, par['telluric']['telgridfile'],
                                         modelfile, outfile,
