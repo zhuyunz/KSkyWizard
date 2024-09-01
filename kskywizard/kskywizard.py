@@ -272,7 +272,7 @@ class KCWIViewerApp:
 
         # Add navigation toolbar
         self.toolbarFrame = tk.Frame(master=root)
-        self.toolbarFrame.grid(row=6,column=2, columnspan = 2, sticky='ew')
+        self.toolbarFrame.grid(row=6,column=0, columnspan = 3, sticky='ew')
         self.toolbar = NavigationToolbar2Tk(self.canvas, self.toolbarFrame)
         # self.toolbar.home_toggle(True)
 
@@ -283,8 +283,8 @@ class KCWIViewerApp:
         self.canvas.mpl_connect('key_press_event', self.on_type) #add all the interactive functions with keyboard press
 
         #Add the entry to update the indices of x and y coordinates in the DS9 region used for spectrum extraction
-        self.region_box_label = tk.Label(root, text = 'Region for spectrum extraction from cube (x1, y1, x2, y2):')
-        self.region_box_label.grid(row = 6, column = 4, sticky='ew')
+        self.region_box_label = tk.Label(root, text = 'Cube extraction (x1, y1, x2, y2):', anchor='e')
+        self.region_box_label.grid(row = 6, column = 3, columnspan=2, sticky='ew')
         self.region_box_entry = tk.Entry(root)
         self.region_box_entry.grid(row = 6, column = 5, sticky='ew')
         self.region_box_entry.bind("<Return>", self.update_region_idx)
