@@ -78,7 +78,7 @@ class KCWIViewerApp:
         Initialize the GUI window
         """
         self.root = root
-        self.root.title("KCWI Data Viewer")
+        self.root.title("KCWI Sky Wizard")
         self.last_focused_entry = None
 
         # Create a custom style
