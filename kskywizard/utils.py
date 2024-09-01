@@ -4,9 +4,12 @@ from pypeit.spectrographs.util import load_spectrograph
 import zap
 import os
 import re
+import numpy as np
+from scipy.interpolate import interp1d
 from astropy.io import fits
 import math
 import ref_index
+import pkg_resources
 try:
     from ConfigParser import ConfigParser
 except ImportError:
@@ -95,7 +98,7 @@ def kcwi_correct_extin(img0, hdr0):
     air = hdr['AIRMASS']
 
     # read extinction data
-    full_path = re.sub('py/kcwi_tools.py', 'data/extin/snfext.fits', kcwi_tools.__file__)
+    full_path = pkg_resources.resource_filename(__name__, 'data/extin/snfext.fits')
     if os.path.exists(full_path):
         hdul = fits.open(full_path)
         exwl = hdul[1].data['LAMBDA']
