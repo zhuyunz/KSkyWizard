@@ -7,6 +7,65 @@ This GUI is designed to refine the sky subtraction, flux calibration, and tellur
 The sky subtraction is performed using the [`ZAP`](https://zap.readthedocs.io/en/latest/) package with a PCA approach. 
 The telluric correction makes use of the tellfit function of the [`Pypeit`](https://pypeit.readthedocs.io/en/release/telluric.html) package to derive the best-fit telluric model of the standard star.
 
+## Installation
+
+1. Create a new conda environment:
+
+   ```bash
+   conda create -n kskywizard python=3.11
+   conda activate kskywizard
+   ```
+
+2. Git clone this repository and install the required packages:
+
+   ```bash
+   git clone https://github.com/zhuyunz/KSkyWizard.git
+   cd KSkyWizard
+   conda env update --file environment.yml
+   ```
+
+3. Install PypeIt:
+
+   ```bash
+   pip install pypeit
+   ```
+
+4. In a separate directory, install zap_for_kcwi:
+
+   ```bash
+   git clone https://github.com/jasonpeng17/zap_for_kcwi.git
+   cd zap_for_kcwi
+   python setup.py install
+   ```
+
+5. Return to the KSkyWizard directory, and run the setup code:
+
+   ```bash
+   cd /path/to/KSkyWizard
+   python setup.py install
+   ```
+
+## Download the Mauna Kea telluric data
+
+This tool relies on PypeIt to perform telluric correction using preconstructed PCA models. Before running the tool, you need to download the correct telluric data and link it to this tool.
+
+1. Download the telluric data:
+
+   ```bash
+   pypeit_install_telluric TelFit_MaunaKea_3100_26100_R20000.fits
+   ```
+
+2. Locate the telluric data. 
+
+   The telluric data is typically stored in `~/.pypeit/cache/download/url/`. Multiple files might be present in subdirectories. Each subdirectory contains a `contents` file (the actual data file) and a `url` file (an ASCII file linking to the download URL).
+
+   Find the path to the `contents` file and set it as the `telgridfile` variable in `setup.py`. For example:
+
+   `telgridfile = ~/.pypeit/cache/download/url/5f17ecc1fcc921d6ec01e18d931ec2f8/contents`
+
+   **Note**: DO NOT include quotation marks around the file path.
+
+
 ## Prerequisites
 
 1. Install and run all the way through the [`KCWI DRP`](https://kcwi-drp.readthedocs.io/en/latest/). You can skip the sky subtraction as the GUI will handle it later.
