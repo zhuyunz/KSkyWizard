@@ -28,9 +28,9 @@ def read_setup_cfg(section, key):
 
 telgridfile = read_setup_cfg('telluric', 'telgridfile')
 try:
-    fits.open(telgridfile)
+    hdu = fits.open(telgridfile)
 except:
-    raise ValueError(f"Telgrid file: '{telgridfile}', in 'setup.py' does not exist.")
+    raise ValueError(f"Telgrid file: '{telgridfile}', in 'setup.cfg' does not exist.")
 
 def telluric_correct(infile_path: str,  star_ra: float, star_dec: float, 
                      spectrograph = 'keck_kcrm'):
