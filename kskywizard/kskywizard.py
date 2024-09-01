@@ -498,7 +498,7 @@ class KCWIViewerApp:
         # self.plot_spectrum(hdu = self.scihdu[0].data, xrange = [self.region_idx[0], self.region_idx[2]], yrange = [self.region_idx[1], self.region_idx[3]])
         self.update_index_entries()
 
-    def open_glob_file(self, initialdir=initial_dir, ext='*_invsens.fits'):
+    def open_glob_file(self, initialdir=initial_dir, ext='*_invsens.fits', flag='DRP'):
         """tk on macOS does not support *_invsens.fits filters. Reinventing wheels here..."""
         
         # Get the directory from the base path
@@ -514,23 +514,38 @@ class KCWIViewerApp:
         # Create a new Toplevel window for file selection
         file_selection_window = tk.Toplevel(self.root)
         file_selection_window.title("Select file")
+        file_selection_window.geometry("800x400")  # Adjust width and height as needed
 
         # Variable to store the selected file
         selected_file = tk.StringVar()
         
-        # Add a Listbox to display the matching files
-        listbox = tk.Listbox(file_selection_window, selectmode=tk.SINGLE, width=80, height=20)
-        listbox.pack(padx=10, pady=10)
+        # Create a Treeview widget with two columns: File Name and Indicator
+        tree = ttk.Treeview(file_selection_window, columns=("File", "Indicator"), show='headings')
+        tree.heading("File", text="File Name")
+        tree.heading("Indicator", text="Have update?")
+        tree.column("File", width=600)  # Adjust width as needed
+        tree.column("Indicator", width=100, anchor='center')  # Adjust width as needed
 
-        # Populate the Listbox with matching files
-        for file in matching_files:
-            listbox.insert(tk.END, file)
+        # Populate the Treeview with matching files
+        for i, file in enumerate(matching_files):
+            # Add an indicator for each file (for example, a checkmark or other symbol)
+            if flag=='DRP':
+                if os.path.isfile(os.path.join(self.output, os.path.basename(file).replace('.fits', '_updated.fits'))):
+                    indicator = "✔"
+                else:
+                    indicator = ""
+            else:
+                indicator = "✔"
+            tree.insert("", tk.END, values=(file, indicator))
+        
+        tree.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
+
         
         # Function to handle file selection
         def select_file():
-            selected_index = listbox.curselection()
-            if selected_index:
-                selected_file.set(listbox.get(selected_index))
+            selected_item = tree.selection()
+            if selected_item:
+                selected_file.set(tree.item(selected_item, "values")[0])  # Get the file name from the selected item
                 file_selection_window.destroy()
             else:
                 self.insert_text("[INFO] No file selected.")
@@ -1346,9 +1361,9 @@ class KCWIViewerApp:
         if type == 'DRP':
             #filename = filedialog.askopenfilename(initialdir=self.base, 
             #    filetypes=(("DRP invsens files", "*.*invsens.fits"), ("All files", '*.*')))
-            filename = self.open_glob_file(initialdir=self.base, ext='*_invsens.fits')
+            filename = self.open_glob_file(initialdir=self.base, ext='*_invsens.fits', flag='DRP')
         else:
-            filename = self.open_glob_file(initialdir=self.output, ext='*_invsens_updated.fits')
+            filename = self.open_glob_file(initialdir=self.output, ext='*_invsens_updated.fits', flag='updated')
         # filename = '/scr/zzhuang/keck_obs/kcwi/2023sep23/red/redux/kr230923_00174_invsens.fits' #for test purpose only
         if filename:
             self.std_entry.delete(0, tk.END)
