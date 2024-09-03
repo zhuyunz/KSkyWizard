@@ -1056,7 +1056,9 @@ class KCWIViewerApp:
         self.obswave = (np.arange(self.scihdr['NAXIS3']) + 1 - self.scihdr['CRPIX3']) * self.scihdr['CD3_3'] + self.scihdr['CRVAL3']
         
         ncpu = read_setup_cfg('processing', 'ncpu')
-        if ncpu is not None:
+        if ncpu == 'None':
+            ncpu = None
+        else:
             ncpu = int(ncpu)
 
         #In-field sky:
