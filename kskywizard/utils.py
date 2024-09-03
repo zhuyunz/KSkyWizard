@@ -29,7 +29,7 @@ def read_setup_cfg(section, key):
 
     return my_value
 
-telgridfile = read_setup_cfg('telluric', 'telgridfile')
+telgridfile = read_setup_cfg('processing', 'telgridfile')
 try:
     hdu = fits.open(telgridfile)
 except:
