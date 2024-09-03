@@ -259,6 +259,7 @@ class KCWIViewerApp:
 
         
         ######################## Plotting area
+        # TODO: split the plotting space to two, so that the invsens and science figures can be retrieved by clicking the tab.
         self.figure = Figure(figsize = (12, 4))
         self.ax = self.figure.add_subplot(111)
         self.figure.tight_layout(rect=[0.05, 0.03, 1, 0.92])
@@ -1332,8 +1333,12 @@ class KCWIViewerApp:
             self.cleanhdu_flux['SKYMODEL_ZAP'].data *= mscal
             self.cleanhdu_flux[0].header['BUNIT'] = '1e-16 erg / (Angstrom cm2 s)'
             self.cleanhdu_flux[0].header['STDCOR'] = (True, 'std corrected?')
-            self.cleanhdu_flux[0].header['MSFILE'] = ('%s_invsens_updated.fits'%self.std['frame'], 'Master std filename')
-            self.cleanhdu_flux[0].header['MSIMNO'] = (int(self.std['frame'][-5:]), 'master std image number')
+            self.cleanhdu_flux[0].header['MSFILE'] = ('{}_invsens_updated.fits'.format(self.std['frame']), 'Master std filename')
+            try:
+                # This header may not be necessary? -YC
+                self.cleanhdu_flux[0].header['MSIMNO'] = (int(self.std['frame'][-5:]), 'master std image number')
+            except:
+                pass
 
             try:
                 self.cleanhdu_flux['NOSKYSUB'].data *= mscal
@@ -1456,13 +1461,14 @@ class KCWIViewerApp:
 
 
             #load the flux-calibrated spec for comparison
-            try:
-                std = fits.getdata('{0}/{1}.fits'.format(self.stddir, self.std['name']))
-            except ValueError:
-                self.insert_text(f"Cannot find the std spec for {self.std_name} in {self.stddir}")
+            if self.std['name'] != 'combined':
+                try:
+                    std = fits.getdata('{0}/{1}.fits'.format(self.stddir, self.std['name']))
+                except ValueError:
+                    self.insert_text(f"Cannot find the std spec for {self.std_name} in {self.stddir}")
 
-            use = np.where((std['WAVELENGTH'] >= hdr['WAVGOOD0'] - 5) & (std['WAVELENGTH'] <= hdr['WAVGOOD1'] + 5))[0] #only load the spectrum in the good wavelength region
-            self.std['spec_calib'] = np.column_stack((std['WAVELENGTH'][use], std['FLUX'][use]))
+                use = np.where((std['WAVELENGTH'] >= hdr['WAVGOOD0'] - 5) & (std['WAVELENGTH'] <= hdr['WAVGOOD1'] + 5))[0] #only load the spectrum in the good wavelength region
+                self.std['spec_calib'] = np.column_stack((std['WAVELENGTH'][use], std['FLUX'][use]))
 
             # self.std['flag'] = self.mask_skyline_region(self.std['wave']) #flag indicated if a region is masked out
             # self.std['use_ind'] = np.array([], dtype = int) #a list of indices for the single points used for fitting
@@ -1529,7 +1535,8 @@ class KCWIViewerApp:
         self.ax.clear()
         self.ax.step(self.std['wave'], self.std['counts'] * self.std['invsens_model_drp'], 
                         color = 'r', lw =1, label = 'Flux calibrated spec (DRP)', where = 'mid', alpha = 0.5) #raw count x invsens = flux-calibrated spec
-        self.ax.plot(self.std['spec_calib'][:,0], self.std['spec_calib'][:,1], color = 'k', label = 'Standard star template')
+        if self.std['name'] != 'combined':
+            self.ax.plot(self.std['spec_calib'][:,0], self.std['spec_calib'][:,1], color = 'k', label = 'Standard star template')
 
 
         use_region = np.where(self.std['flag'] == 1)[0]
@@ -1601,6 +1608,10 @@ class KCWIViewerApp:
 
         if not hasattr(self, 'std'):
             self.insert_text(f"[ERROR] The updated invsens file not exists! Run the sensfunc fit first with the key'f' first!")
+            return
+        
+        if self.std['name'] == 'combined':
+            self.insert_text(f"[ERROR] Telluric fit connot be run on the combined model. Go back to run them invididually, and stack again.")
             return
         
         ################# create the "fake" Pypeit output for telluric correction ############
