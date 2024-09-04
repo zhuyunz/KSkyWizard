@@ -374,32 +374,41 @@ class KCWIViewerApp:
         else:
             self.index2_entry.delete(0, tk.END)
 
-    def get_file_prefix_index(self, input):
+    def get_file_prefix_index(self, input, sci_index = True):
         # extract the prefix and index from the input string
 
         # if input is a number
         try:
-            self.index = int(input)
+            if sci_index:
+                self.index = int(input)
+            else:
+                self.index2 = int(input)
             number_flag=True
+
         except:
             number_flag = False
         
         if number_flag:
             # Find the common string name for a given date
-            try:
-                self.prefix = os.path.basename(glob(f'{self.base}/k*.fits')[0])[:8]
-            except:
-                self.prefix = None
-                raise ValueError(f'No KCWI file found in {self.base}')
-            
-            filename = os.path.join(self.base, f'{self.prefix}_{self.index:05d}.fits')
-            if not os.path.isfile(filename):
-                raise IndexError(f"File name {filename} not found. Try specify the full filename.")
+            if sci_index:
+                try:
+                    self.prefix = os.path.basename(glob(f'{self.base}/k*.fits')[0])[:8]
+                except:
+                    self.prefix = None
+                    raise ValueError(f'No KCWI file found in {self.base}')
+                
+                filename = os.path.join(self.base, f'{self.prefix}_{self.index:05d}_{self.ctype}.fits')
+                if not os.path.isfile(filename):
+                    raise IndexError(f"File name {filename} not found. Try specify the full filename.")
+                
         else:
             # input is a string of basename or full filename
             try:
-                self.prefix = os.path.basename(input)[:8]
-                self.index = int(os.path.basename(input)[9:14])
+                if sci_index:
+                    self.prefix = os.path.basename(input)[:8]
+                    self.index = int(os.path.basename(input)[9:14])
+                else:
+                    self.index2 = int(os.path.basename(input)[9:14])
             except:
                 raise ValueError('Failed to load science file. Check the input frame number.')
 
@@ -437,7 +446,7 @@ class KCWIViewerApp:
         #if update the sky frame number
         if self.last_focused_entry == self.index2_entry and self.index2 > 0:
             self.index2_entry.delete(0, tk.END)
-            self.index2_entry.insert(tk.END, str(self.index2))
+            self.index2_entry.insert(tk.END, f'{self.prefix}_{self.index2:05d}')
             self.insert_text(f"[INFO] Set the sky frame for science frame {self.prefix}_{self.index:05d}: {self.prefix}_{self.index2:05d} ")
             # self.index2_entry.selection_clear()
 
@@ -1486,7 +1495,8 @@ class KCWIViewerApp:
                     "'e' - exclude fitting regions;\n"
                     "'a' - add a single data point for fitting;\n"
                     "'d' - delete a single data point;\n"
-                    "'f' - refit the sensitivity curve;\n"
+                    "'f' - refit the sensitivity curve with spline;\n"
+                    "'b' - reverse the DRP sensitivity curve;\n"
                     "'t' - fit the telluric model [this may take a while].")
             self.insert_text(inst)
 
@@ -1767,6 +1777,13 @@ class KCWIViewerApp:
             # print(len(use), self.std['wave'])
             self.std['invsens_model'] = self.fit_bspline(self.std['wave'], self.std['invsens_data'], self.std['bspline_bkpt'], self.std['bspline_polyorder'], use)
             
+            self.plot_std(restore_limit = True)
+
+        #reverse it back the DRP invsens
+        if event.key == 'b':
+            self.std['invsens_model'] = self.std['invsens_model_drp'].copy()
+            self.insert_text(f"[INFO] Revert to the DRP invsens!")
+
             self.plot_std(restore_limit = True)
 
         #running the telluric correction
