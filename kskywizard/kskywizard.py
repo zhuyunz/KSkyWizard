@@ -1064,6 +1064,11 @@ class KCWIViewerApp:
             return
         self.obswave = (np.arange(self.scihdr['NAXIS3']) + 1 - self.scihdr['CRPIX3']) * self.scihdr['CD3_3'] + self.scihdr['CRVAL3']
         
+        ncpu = read_setup_cfg('processing', 'ncpu')
+        if ncpu == 'None':
+            ncpu = None
+        else:
+            ncpu = int(ncpu)
 
         #In-field sky:
         if self.index2 < 0:
@@ -1071,7 +1076,7 @@ class KCWIViewerApp:
             self.skyhdu = None
             maskpath = f'{self.output}/{self.prefix}_{self.mindex:05d}_zap_mask.fits'
             zobj = zap.process(f'{self.output}/{self.prefix}_{self.index:05d}_{self.ctype}.fits',
-                  mask = maskpath, interactive = True, 
+                  mask = maskpath, interactive = True, ncpu=ncpu,
                   cfwidthSP = self.zap['cfwidth'], cfwidthSVD = self.zap['cfwidth'], skyseg = self.zap['skyseg'], zlevel = 'median')
 
         #Off-field sky
@@ -1080,10 +1085,10 @@ class KCWIViewerApp:
             self.skyhdu = fits.open(f'{self.output}/{self.prefix}_{self.index2:05d}_{self.ctype}.fits')
             maskpath = f'{self.output}/{self.prefix}_{self.index2:05d}_zap_mask.fits'
             extSVD = zap.SVDoutput(f'{self.output}/{self.prefix}_{self.index2:05d}_{self.ctype}.fits',
-                       mask = maskpath,
+                       mask = maskpath, ncpu=ncpu,
                         skyseg = self.zap['skyseg'], zlevel = 'median')
             zobj = zap.process(f'{self.output}/{self.prefix}_{self.index:05d}_{self.ctype}.fits', extSVD=extSVD, interactive = True,
-                  cfwidthSP = self.zap['cfwidth'], 
+                  cfwidthSP = self.zap['cfwidth'], ncpu=ncpu, 
                    skyseg = self.zap['skyseg'])
 
         nsig = 3
