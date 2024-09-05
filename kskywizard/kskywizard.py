@@ -1367,7 +1367,7 @@ class KCWIViewerApp:
 
         #save the white-lighted image of the clean cube
         wlimg_index = np.where((self.obswave >= self.wlimg_wave_range[0]) & (self.obswave <= self.wlimg_wave_range[1]))[0]
-        wlimg = np.sum(self.cleanhdu_flux[0].data, axis = 0)
+        wlimg = np.sum(self.cleanhdu_flux[0].data[wlimg_index], axis = 0)
         hdr2d = collapse_header(self.cleanhdu_flux[0].header)
         wlhdu = fits.PrimaryHDU(wlimg, header = hdr2d)
         wlhdu.header['WAVWLIMG0'] = self.wlimg_wave_range[0]
