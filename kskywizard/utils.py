@@ -137,6 +137,36 @@ def kcwi_correct_extin(img0, hdr0):
     else:
         print("Extinction data file (%s) not found!" % full_path)
 
+def scale_extinct_sky(hdr_sky, hdr_sci):
+    """Atmospheric extinction correction from official KCWI DRP"""
+
+    # get airmass
+    air_sky = hdr_sky['AIRMASS']
+    air_sci = hdr_sci['AIRMASS']
+    # read extinction data
+    full_path = pkg_resources.resource_filename(__name__, 'data/extin/snfext.fits')
+    if os.path.exists(full_path):
+        hdul = fits.open(full_path)
+        exwl = hdul[1].data['LAMBDA']
+        exma = hdul[1].data['EXT']
+        # get object wavelengths
+        dw = hdr_sky['CD3_3']
+        w0 = hdr_sky['CRVAL3']
+        owls = np.arange(hdr_sky['NAXIS3']) * dw + w0
+        # linear interpolation
+        exint = interp1d(exwl, exma, kind='cubic', bounds_error=False,
+                         fill_value='extrapolate')
+        # resample extinction curve
+        oexma = exint(owls)
+        # convert to flux ratio
+        flxr_sky = 10.**(oexma * air_sky * 0.4)
+        flxr_sci = 10.**(oexma * air_sci * 0.4)
+            
+        return flxr_sky / flxr_sci
+    
+    else:
+        print("Extinction data file (%s) not found!" % full_path)
+
 
 def reassign_skyseg(x_segments, widths, new_segment, new_width, min_span = 100):
     """

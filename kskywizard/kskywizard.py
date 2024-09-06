@@ -682,7 +682,9 @@ class KCWIViewerApp:
             self.skyhdu = fits.open(self.skypath)
             if datatype == 'raw':
                 self.skyhdu = self.crop_cube(self.skyhdu) #crop the data cube to good wavelength region
-                self.insert_text(f"[INFO] Loading the DRP-reduced sky frame {self.prefix}_{self.index2:05d}")
+                scale_factor = scale_extinct_sky(self.skyhdu[0].header, self.scihdu[0].header) #scale the sky to the same airmass as sci
+                self.skyhdu[0].data *= scale_factor[:, np.newaxis, np.newaxis]
+                self.insert_text(f"[INFO] Loading the DRP-reduced sky frame {self.prefix}_{self.index2:05d} and scale it by {np.median(scale_factor):.2f}")
             else:
                 self.insert_text(f"[INFO] Loading the cropped DRP-reduced sky frame {self.prefix}_{self.index2:05d} for {self.prefix}_{self.index:05d}")
             # self.plot_spectrum(self.scihdu[0].data, hdu_sky=self.skyhdu[0].data, 
