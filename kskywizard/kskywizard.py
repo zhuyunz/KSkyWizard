@@ -1327,8 +1327,13 @@ class KCWIViewerApp:
 
         else:
             use = (self.std['wave']>= self.obswave[0]) & (self.std['wave'] <= self.obswave[-1])
-            tellmodel = self.std['tellmodel'][use]**(self.cleanhdu[0].header['AIRMASS']) #convert the telluric model at AM=1.0 to the real AM
-            
+
+            try:
+                tellmodel = self.std['tellmodel'][use]**(self.cleanhdu[0].header['AIRMASS']) #convert the telluric model at AM=1.0 to the real AM
+            except:
+                tellmodel = 1.0
+                self.insert_text(f'[WARNING] Cannot find the telluric model! Running the flux calibration without telluric correction...') 
+
             #flux calibration and telluric correction
             if self.ctype == 'icubes':
                 self.insert_text(f'[INFO] The input datacube has been flux calibrated! Skip the flux calibration. Running telluric correction...')
