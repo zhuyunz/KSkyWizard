@@ -39,10 +39,11 @@ The telluric correction makes use of the tellfit function of the [`Pypeit`](http
    ```
 
 5. **Return to the KSkyWizard directory, and run the setup code:**
+  At the moment, we encourage you to install the KSkyWizard under development mode, as it would be easier to track all the updates.
 
    ```bash
    cd /path/to/KSkyWizard
-   python setup.py install
+   python setup.py develop
    ```
 
 ## Download the Mauna Kea telluric data
@@ -59,7 +60,7 @@ This tool relies on PypeIt to perform telluric correction using preconstructed P
 
    The telluric data is typically stored in `~/.pypeit/cache/download/url/`. Multiple files might be present in subdirectories. Each subdirectory contains a `contents` file (the actual data file) and a `url` file (an ASCII file linking to the download URL).
 
-   Find the path to the `contents` file and set it as the `telgridfile` variable in `setup.py`. For example:
+   Find the path to the `contents` file and set it as the `telgridfile` variable in `setup.cfg`. If you install KSkyWizard under development mode, you can find the `setup.cfg' in /path/to/KSkyWizard/ For example:
 
    `telgridfile = ~/.pypeit/cache/download/url/5f17ecc1fcc921d6ec01e18d931ec2f8/contents`
 
@@ -70,27 +71,33 @@ This tool relies on PypeIt to perform telluric correction using preconstructed P
 
 1. Install and run all the way through the [`KCWI DRP`](https://kcwi-drp.readthedocs.io/en/latest/). You can skip the sky subtraction as the GUI will handle it later.
    
-   `reduce -r -f kr*fits -k`
-   
-   Please note that the released branch of the KCWI DRP only contains the standard star spectra up to 9200A. If your configuration goes beyond that, please replace the files in kcwidrp/data/stds/ with the ones in their develop branch.
+   `reduce -r -f kr*fits -k -g`
 
-2. Install the [`Pypeit`](https://pypeit.readthedocs.io/en/release/telluric.html) package and the modified version of the [`ZAP`](https://github.com/jasonpeng17/zap_for_kcwi) package.
+2. Turn on the sky subtraction for the standard star to obtain the preliminary sensitivity curve. For example:
+   `reduce -r -f STD_FRAME.fits` or `reduce -r -l std.list`
+   
+4. Install the [`Pypeit`](https://pypeit.readthedocs.io/en/release/telluric.html) package and the modified version of the [`ZAP`](https://github.com/jasonpeng17/zap_for_kcwi) package.
    The major difference between the official ZAP and the modified one is described in the Continuum Filter Widths and Wavelength Segments Section [here](https://github.com/jasonpeng17/zap_for_kcwi/blob/master/doc/index.rst).
 
-3. Download the telluric model grid via `pypeit_install_telluric TelFit_MaunaKea_3100_26100_R20000.fits`. Update the `telgridfile` in the kcwi_viewer.py as
+5. Download the telluric model grid via `pypeit_install_telluric TelFit_MaunaKea_3100_26100_R20000.fits`. Update the `telgridfile` in the kcwi_viewer.py as
    `telgridfile = your_path_of_telfit_file`. If you can't find the downloaded file, it is usually stored at ~/.pypeit/cache/download/url/*. The file `contents` is TelFit_MaunaKea_3100_26100_R20000.fits. Alternatively, you can directly download the file using the link in `url` in the same directory.  
 
-4. Set the `initial_dir` in the kcwi_viewer.py as your favorite data directory, or set it as None.
+6. Set the `initial_dir` in the kcwi_viewer.py as your favorite data directory, or set it as None.
 
-5. Install the entire KcwiKit package. To make it available in your Python file directly, please add its path to the PYTHONPATH environmental variable:
+7. Install the entire KcwiKit package. To make it available in your Python file directly, please add its path to the PYTHONPATH environmental variable:
 
    `export PYTHONPATH=${PYTHONPATH}:YOUR_PATH_OF_KCWIKIT/py`
 
 ## Usage
 
 ### 1. Run the GUI
+
+   You can run it either in the directory of the reduced data, or anywhere else and specify the input directory later in the GUI.
    
-   `python kcwi_viewer.py`
+   ```bash
+   conda activate kskywizard
+   kskywizard
+   ```
 
    A GUI window will pop up.
    <img width="1208" alt="image" src="https://github.com/zhuyunz/KcwiKit/assets/33030986/1802ca72-4767-47ef-a876-2a96ec4aa216">
