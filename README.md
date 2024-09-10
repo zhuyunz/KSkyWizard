@@ -39,10 +39,11 @@ The telluric correction makes use of the tellfit function of the [`Pypeit`](http
    ```
 
 5. **Return to the KSkyWizard directory, and run the setup code:**
+  At the moment, we encourage you to install the KSkyWizard under development mode, as it would be easier to track all the updates.
 
    ```bash
    cd /path/to/KSkyWizard
-   python setup.py install
+   python setup.py develop
    ```
 
 ## Download the Mauna Kea telluric data
@@ -59,7 +60,7 @@ This tool relies on PypeIt to perform telluric correction using preconstructed P
 
    The telluric data is typically stored in `~/.pypeit/cache/download/url/`. Multiple files might be present in subdirectories. Each subdirectory contains a `contents` file (the actual data file) and a `url` file (an ASCII file linking to the download URL).
 
-   Find the path to the `contents` file and set it as the `telgridfile` variable in `setup.py`. For example:
+   Find the path to the `contents` file and set it as the `telgridfile` variable in `setup.cfg`. If you install KSkyWizard under development mode, you can find the `setup.cfg' in /path/to/KSkyWizard/ For example:
 
    `telgridfile = ~/.pypeit/cache/download/url/5f17ecc1fcc921d6ec01e18d931ec2f8/contents`
 
@@ -70,27 +71,26 @@ This tool relies on PypeIt to perform telluric correction using preconstructed P
 
 1. Install and run all the way through the [`KCWI DRP`](https://kcwi-drp.readthedocs.io/en/latest/). You can skip the sky subtraction as the GUI will handle it later.
    
-   `reduce -r -f kr*fits -k`
+   `reduce -r -f kr*fits -k -g`
+
+2. Turn on the sky subtraction for the standard star to obtain the preliminary sensitivity curve. For example:
    
-   Please note that the released branch of the KCWI DRP only contains the standard star spectra up to 9200A. If your configuration goes beyond that, please replace the files in kcwidrp/data/stds/ with the ones in their develop branch.
+   `reduce -r -f STD_FRAME.fits`
 
-2. Install the [`Pypeit`](https://pypeit.readthedocs.io/en/release/telluric.html) package and the modified version of the [`ZAP`](https://github.com/jasonpeng17/zap_for_kcwi) package.
-   The major difference between the official ZAP and the modified one is described in the Continuum Filter Widths and Wavelength Segments Section [here](https://github.com/jasonpeng17/zap_for_kcwi/blob/master/doc/index.rst).
+   or `reduce -r -l std.list`
 
-3. Download the telluric model grid via `pypeit_install_telluric TelFit_MaunaKea_3100_26100_R20000.fits`. Update the `telgridfile` in the kcwi_viewer.py as
-   `telgridfile = your_path_of_telfit_file`. If you can't find the downloaded file, it is usually stored at ~/.pypeit/cache/download/url/*. The file `contents` is TelFit_MaunaKea_3100_26100_R20000.fits. Alternatively, you can directly download the file using the link in `url` in the same directory.  
 
-4. Set the `initial_dir` in the kcwi_viewer.py as your favorite data directory, or set it as None.
-
-5. Install the entire KcwiKit package. To make it available in your Python file directly, please add its path to the PYTHONPATH environmental variable:
-
-   `export PYTHONPATH=${PYTHONPATH}:YOUR_PATH_OF_KCWIKIT/py`
 
 ## Usage
 
 ### 1. Run the GUI
+
+   You can run it either in the directory of the reduced data, or anywhere else and specify the input directory later in the GUI.
    
-   `python kcwi_viewer.py`
+   ```bash
+   conda activate kskywizard
+   kskywizard
+   ```
 
    A GUI window will pop up.
    <img width="1208" alt="image" src="https://github.com/zhuyunz/KcwiKit/assets/33030986/1802ca72-4767-47ef-a876-2a96ec4aa216">
@@ -111,7 +111,8 @@ Browse and select the input directory to be the `redux` directory where all the 
    - Note: Please do not remove the start and end point of the spectrum to avoid running into problems.
    - Press 'f' to re-fit the sensitivity function. You can iteratively choose the regions and re-fit the sensitivity function until you are happy with the model (the cyan line)
      <img width="1193" alt="image" src="https://github.com/zhuyunz/KcwiKit/assets/33030986/a0125d01-9fe0-4bc0-807f-d857b89b0463">
-   - Press 't' to derive the telluric model. This step will take a while and the GUI would become frozen. Be patient until you see the output.
+   - Press 'b' to reverse to the DRP's sensitivity function. If you don't want to run the 'f' option, simply press 'b' to register the DRP's curve first before proceeding.
+   - Press 't' to derive the telluric model. This step will take a while and the GUI will become frozen. Be patient until you see the output. You can skip this part if you don't want the telluric correction to be applied to your data.
      <img width="1180" alt="image" src="https://github.com/zhuyunz/KcwiKit/assets/33030986/14e5ab89-2ac4-42b4-9c01-01be296a35b4">
    - Press the `Save updated invsens` button if you are happy with the results.
 
@@ -147,13 +148,13 @@ Browse and select the input directory to be the `redux` directory where all the 
    Now you can examine the sky-subtracted spectrum to see if that looks good to you. By default, it will extract the spectrum from a 10x10 box centered on the center of the FoV (i.e., a box with lower left at (x1, y1) = (13,44) and upper right at (x2, y2) = (23, 54). You can update the region used to extract the spectrum simply by updating the DS9 pixel indices in the box below the plotting canvas as `x1, y1, x2, y2` (lower left + upper right). 
    <img width="1178" alt="image" src="https://github.com/zhuyunz/KcwiKit/assets/33030986/527c7005-6f49-4b5e-be97-4bfa37c6728c">
 
-   The pre-ZAP spec is scaled to have the same median as the sky-subtracted spectrum for better display purpose.
+   The pre-ZAP spec is scaled to have the same median as the sky-subtracted spectrum for better display purposes.
 
-   If you set the redshift, it will also indicate where the emission lines are expected to be. You can use the navigation bar to examine the plot, and go back to the full plot with right click. Besides, you can also examine the plot with following options (click the canvas first to activate the keyboard interaction):
+   If you set the redshift, it will also indicate where the emission lines are expected to be. You can use the navigation bar to examine the plot, and go back to the full plot with right click. Besides, you can also examine the plot with the following options (click the canvas first to activate the keyboard interaction):
    
    - Press 'n' to turn off the pre-ZAP spec.
-   - Press 's' to turn on the pre-ZAP spec so that you would know where the sky lines are.
-   - Press 'o' to move the spectrum to the observed frame. It is useful when you want to update the sky segment (which requires observed frame) and re-run ZAP.
+   - Press 's' to turn on the pre-ZAP spec so that you would know where the skylines are.
+   - Press 'o' to move the spectrum to the observed frame. It is useful when you want to update the sky segment (which requires in the observed frame) and re-run ZAP.
    - Press 'r' to move the spectrum to the rest frame.
 
    Go to the next frame if you are happy with the spectrum; otherwise, press `Run ZAP` button and run the sky subtraction again with the updated sky segment. It's always a good idea to check the output `_zap_icubes.fits`! For the frame using the in-field sky, you can also check the white-lighted image of the clean datacube `_zapclean_wlimg.fits` to make sure the source is properly masked. You can update the DS9 region mask and re-run the ZAP again!
