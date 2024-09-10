@@ -1,4 +1,4 @@
-# KCWI Post-DRP GUI instruction
+<img width="409" alt="image" src="https://github.com/user-attachments/assets/e762d33d-425d-4f32-b13e-f0f81fb20542"># KCWI Post-DRP GUI instruction
 ## Version: 06/03/2024
 
 ## About The GUI
@@ -111,7 +111,8 @@ Browse and select the input directory to be the `redux` directory where all the 
    - Note: Please do not remove the start and end point of the spectrum to avoid running into problems.
    - Press 'f' to re-fit the sensitivity function. You can iteratively choose the regions and re-fit the sensitivity function until you are happy with the model (the cyan line)
      <img width="1193" alt="image" src="https://github.com/zhuyunz/KcwiKit/assets/33030986/a0125d01-9fe0-4bc0-807f-d857b89b0463">
-   - Press 't' to derive the telluric model. This step will take a while and the GUI would become frozen. Be patient until you see the output.
+   - Press 'b' to reverse to the DRP's sensitivity function. If you don't want to run the 'f' option, simply press 'b' to register the DRP's curve first before proceeding.
+   - Press 't' to derive the telluric model. This step will take a while and the GUI will become frozen. Be patient until you see the output. You can skip this part if you don't want the telluric correction to be applied to your data.
      <img width="1180" alt="image" src="https://github.com/zhuyunz/KcwiKit/assets/33030986/14e5ab89-2ac4-42b4-9c01-01be296a35b4">
    - Press the `Save updated invsens` button if you are happy with the results.
 
@@ -147,13 +148,13 @@ Browse and select the input directory to be the `redux` directory where all the 
    Now you can examine the sky-subtracted spectrum to see if that looks good to you. By default, it will extract the spectrum from a 10x10 box centered on the center of the FoV (i.e., a box with lower left at (x1, y1) = (13,44) and upper right at (x2, y2) = (23, 54). You can update the region used to extract the spectrum simply by updating the DS9 pixel indices in the box below the plotting canvas as `x1, y1, x2, y2` (lower left + upper right). 
    <img width="1178" alt="image" src="https://github.com/zhuyunz/KcwiKit/assets/33030986/527c7005-6f49-4b5e-be97-4bfa37c6728c">
 
-   The pre-ZAP spec is scaled to have the same median as the sky-subtracted spectrum for better display purpose.
+   The pre-ZAP spec is scaled to have the same median as the sky-subtracted spectrum for better display purposes.
 
-   If you set the redshift, it will also indicate where the emission lines are expected to be. You can use the navigation bar to examine the plot, and go back to the full plot with right click. Besides, you can also examine the plot with following options (click the canvas first to activate the keyboard interaction):
+   If you set the redshift, it will also indicate where the emission lines are expected to be. You can use the navigation bar to examine the plot, and go back to the full plot with right click. Besides, you can also examine the plot with the following options (click the canvas first to activate the keyboard interaction):
    
    - Press 'n' to turn off the pre-ZAP spec.
-   - Press 's' to turn on the pre-ZAP spec so that you would know where the sky lines are.
-   - Press 'o' to move the spectrum to the observed frame. It is useful when you want to update the sky segment (which requires observed frame) and re-run ZAP.
+   - Press 's' to turn on the pre-ZAP spec so that you would know where the skylines are.
+   - Press 'o' to move the spectrum to the observed frame. It is useful when you want to update the sky segment (which requires in the observed frame) and re-run ZAP.
    - Press 'r' to move the spectrum to the rest frame.
 
    Go to the next frame if you are happy with the spectrum; otherwise, press `Run ZAP` button and run the sky subtraction again with the updated sky segment. It's always a good idea to check the output `_zap_icubes.fits`! For the frame using the in-field sky, you can also check the white-lighted image of the clean datacube `_zapclean_wlimg.fits` to make sure the source is properly masked. You can update the DS9 region mask and re-run the ZAP again!
