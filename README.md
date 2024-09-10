@@ -1,4 +1,4 @@
-<img width="409" alt="image" src="https://github.com/user-attachments/assets/e762d33d-425d-4f32-b13e-f0f81fb20542"># KCWI Post-DRP GUI instruction
+# KCWI Post-DRP GUI instruction
 ## Version: 06/03/2024
 
 ## About The GUI
