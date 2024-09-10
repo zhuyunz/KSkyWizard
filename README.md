@@ -93,17 +93,17 @@ This tool relies on PypeIt to perform telluric correction using preconstructed P
    ```
 
    A GUI window will pop up.
-   <img width="1208" alt="image" src="https://github.com/zhuyunz/KcwiKit/assets/33030986/1802ca72-4767-47ef-a876-2a96ec4aa216">
+<img width="1200" alt="image" src="https://github.com/user-attachments/assets/c297825f-c714-4b33-96a2-98eb615cedda">
 
 ### 2. Set the input and output directory
 Browse and select the input directory to be the `redux` directory where all the KCWI DRP outputs are stored. Also browse and select the output directory (please create a separate working directory to avoid overwriting the DRP output).
 
 ### 3. Flux calibration and telluric correction.
   
-   Browse and select the *_invsens.fits of the DRP with the `Browse DRP invsens` button.
-   <img width="1206" alt="image" src="https://github.com/zhuyunz/KcwiKit/assets/33030986/177802ee-f669-4470-b844-f1fda3531ff7">
+   Browse and select the *_invsens.fits of the DRP with the `Open DRP invsens` button.
+<img width="1198" alt="image" src="https://github.com/user-attachments/assets/9a3afb1e-26dc-43ae-8576-b629e50c32b1">
    
-   If you are not happy with the default region, you can select the regions interactively. To active this function, please first click the plotting canvas first.
+   If you are not happy with the default region, you can select the regions interactively. To activate this function, please first click the plotting canvas first.
    - Put the mouse and press 'e' on each side of a region to exclude it from the fit
    - Put the mouse and press 'i' on each side of a region to include it from the fit
    - Put the mouse and press 'a' on a single data point to add it into the fit (highly recommend for regions beyond 9000A where most regions are contaminated by telluric)
@@ -116,9 +116,11 @@ Browse and select the input directory to be the `redux` directory where all the 
      <img width="1180" alt="image" src="https://github.com/zhuyunz/KcwiKit/assets/33030986/14e5ab89-2ac4-42b4-9c01-01be296a35b4">
    - Press the `Save updated invsens` button if you are happy with the results.
 
+Sometimes, there are spikes in the spectrum of the standard star if you turn off the cosmic ray rejection in the DRP. As long as they are masked out from the fitting region, you don't need to worry about it.
+
 ### 4. Sky subtraction
 
-   a. Enter the science image number. For instance, enter 85 and press the `return ` button if the frame is kr230923_00085. If you want to use the off-field sky frame, please check the `Use Off-field Sky Frame No.`, also enter the sky image frame number and press return. You can also update the science image number by pressing `Previous` and `Next` button.
+   a.  Switch to the science panel and enter the science image number. For instance, enter 85 and press the `return ` button if the frame is kr230923_00085. If you want to use the off-field sky frame, please check the `Use Off-field Sky Frame No.`, also enter the sky image frame number and press return. You can also update the science image number by pressing `Previous` and `Next` button.
    
    b. If this is the first time that you reduce this frame, please press `Load Raw Cube`, `Save Cropped Cube` and `Load Cropped Cube`. Otherwise, simply press `Load Cropped Cube` to load the data. This step is simply to crop the datacube outside of the good wavelength region to avoid running into edge problem with ZAP.
 
