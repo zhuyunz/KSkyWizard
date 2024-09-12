@@ -1,4 +1,4 @@
-# KCWI Post-DRP GUI instruction
+# KCWI Sky Wizard
 ## Version: 09/10/2024
 
 ## About The GUI
