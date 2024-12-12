@@ -20,7 +20,8 @@ from astropy.io import fits
 from astropy.table import Table
 from astropy.stats import sigma_clip
 import os 
-import pyregion
+#import pyregion
+from regions import Regions
 import re
 from scipy.interpolate import interp1d, splrep, splev
 from astropy.coordinates import SkyCoord
@@ -777,10 +778,26 @@ class KCWIViewerApp:
             self.insert_text(f"[ERROR] Region file {self.prefix}_{mindex:05d}.reg not exists!")
         else:
             self.insert_text(f"[INFO] Reading region file {self.prefix}_{mindex:05d}.reg for {self.prefix}_{self.index:05d}")
-            r = pyregion.open(region_path)
-            region_mask  = r.get_mask(hdu=mhdu[0])
+            
+            # Construct binary masks from the region file
+            with open(region_path, 'r') as f:
+                # Read it out as a string
+                regstr = f.read()
+                
+                # Check if the region file is in physical coordinates
+                if 'physical' in regstr:
+                    self.insert_text("[Warning] 'physical' coordinates no longer supported by regions. Replacing with 'image'")
+                    regstr = regstr.replace('physical', 'image')
+
+                r = Regions.parse(regstr, format='ds9')
+                region_mask = None
+                for region in r.regions:
+                    if region_mask is None:
+                        region_mask = region.to_mask().to_image(mhdu[0].shape).astype(bool)
+                    else:
+                        region_mask = region_mask | region.to_mask().to_image(mhdu[0].shape).astype(bool)
+
             allmask = np.zeros_like(mhdu[0].data)
-            # allmask[edgemask | region_mask] = 1
             allmask[region_mask] = 2
             allmask[edgemask] = 1
             maskhdu = fits.PrimaryHDU(allmask, header = mhdu[0].header)
