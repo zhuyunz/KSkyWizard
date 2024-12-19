@@ -24,6 +24,7 @@ import os
 from regions import Regions
 import re
 from scipy.interpolate import interp1d, splrep, splev
+from scipy.interpolate import PchipInterpolator
 from astropy.coordinates import SkyCoord
 import astropy.units as u
 from typing import List
@@ -1467,6 +1468,9 @@ class KCWIViewerApp:
                 self.std['invsens_model'] = None
                 self.std['tellmodel'] = None
                 self.std['statenam'] = hdr['statenam']
+                xknots, yknots = self.gen_knots(self.std['wave'], self.std['invsens_data'], self.std['flag'])
+                self.std['xknots'] = xknots
+                self.std['yknots'] = yknots
 
             #the updated version, so no need to crop the data
             elif type == 'updated':
@@ -1485,11 +1489,20 @@ class KCWIViewerApp:
                 self.std['frame'] = re.sub('_invsens_updated.fits', '', os.path.basename(self.std_entry.get()))
                 self.std['statenam'] = hdr['statenam']
 
+                # knots
+                if len(hdu) > 1:
+                    self.std['xknots'] = hdu[1].data[0]
+                    self.std['yknots'] = hdu[1].data[1]
+                else:
+                    xknots, yknots = self.gen_knots(self.std['wave'], self.std['invsens_data'], self.std['flag'])
+                    self.std['xknots'] = xknots
+                    self.std['yknots'] = yknots
+
 
 
             #setup the B-Spline fit parameters
-            self.std['bspline_bkpt'] = 150 #breakpoints
-            self.std['bspline_polyorder'] = 3 #polynomial order between interval
+            #self.std['bspline_bkpt'] = 100 #breakpoints
+            #self.std['bspline_polyorder'] = 3 #polynomial order between interval
             
             self.insert_text(f"[INFO] Loading the {self.std_entry.get()}")
 
@@ -1518,8 +1531,8 @@ class KCWIViewerApp:
             inst = ("[INSTRUCTIONS] \n"
                     "'i' - include fitting regions;\n"
                     "'e' - exclude fitting regions;\n"
-                    "'a' - add a single data point for fitting;\n"
-                    "'d' - delete a single data point;\n"
+                    "'a' - add knots for fitting;\n"
+                    "'d' - delete knots;\n"
                     "'f' - refit the sensitivity curve with spline;\n"
                     "'b' - reverse the DRP sensitivity curve;\n"
                     "'t' - fit the telluric model [this may take a while].")
@@ -1544,6 +1557,12 @@ class KCWIViewerApp:
             newdata = np.vstack((newdata, self.std['tellmodel']))
 
         newhdu = fits.PrimaryHDU(newdata, header = newhdr)
+
+        # knots
+        if self.std['xknots'] is not None:
+            knots = np.vstack((self.std['xknots'], self.std['yknots']))
+            khdu = fits.ImageHDU(knots)
+            newhdu = fits.HDUList([newhdu, khdu])
 
         frame = self.std['frame']
         filename = f'{self.output}/{frame}_invsens_updated.fits'
@@ -1573,33 +1592,42 @@ class KCWIViewerApp:
         if self.std['name'] != 'combined':
             self.ax.plot(self.std['spec_calib'][:,0], self.std['spec_calib'][:,1], color = 'k', label = 'Standard star template')
 
-
-        use_region = np.where(self.std['flag'] == 1)[0]
-        use_point = np.where(self.std['flag'] == 2)[0]
+        invsens_region = np.where(self.std['flag'] == 1)[0]
+        telluric_region = np.where(self.std['flag'] == 2)[0]
 
         #plot the updated flux-calibrated model
         if self.std['invsens_model'] is not None:
             self.ax.step(self.std['wave'], self.std['counts'] * self.std['invsens_model'], color = 'cyan', 
                          lw =1, label = 'Flux calibrated spec (refit) ', where = 'mid') #raw count x invsens = flux-calibrated spec
-            self.ax.plot(self.std['wave'][use_region], (self.std['counts'] * self.std['invsens_model'])[use_region], 'x', 
-                        color = 'lightgreen', ms = 5, label = 'Selected for fitting') #selected regions 
-            if len(use_point) > 0:
-                self.ax.plot(self.std['wave'][use_point], (self.std['counts'] * self.std['invsens_model'])[use_point], 'o', 
-                            color = 'darkgreen', ms = 10, label = 'Selected for fitting') #selected pixels 
+            self.ax.plot(self.std['wave'][invsens_region], (self.std['counts'] * self.std['invsens_model'])[invsens_region], 'x', 
+                        color = 'lightgreen', ms = 5, label = 'Selected for invsens fitting') #selected regions 
+            self.ax.plot(self.std['wave'][telluric_region], (self.std['counts'] * self.std['invsens_model'])[telluric_region], 'x', 
+                        color = 'darkgreen', ms = 5, label = 'Selected for telluric fitting') #selected pixels 
 
              #plot the telluric-corrected model
             if self.std['tellmodel'] is not None:
                 telluric = self.std['tellmodel']**(self.std['invsens_hdr']['AIRMASS']) #convert the model at AM=1.0 to the real AM
                 self.ax.step(self.std['wave'], self.std['counts'] * self.std['invsens_model'] / telluric, color = 'royalblue',
                             where = 'mid', lw = 1, label = 'Telluric corrected, flux calibrated spec')
+                
+            if self.std['xknots'] is not None:
+                li = interp1d(self.std['wave'], self.std['counts'], kind = 'linear', bounds_error=False, fill_value = 0)
+                counts_knots = li(self.std['xknots'])
+                self.ax.scatter(self.std['xknots'], (self.std['yknots'] * counts_knots), marker='o', 
+                    color = 'cyan', s = 100, label = 'Knots for invsens fitting', edgecolors='k')
         
         #plot the DRP-reduced flux-calibrated model
         else:
-            self.ax.plot(self.std['wave'][use_region], (self.std['counts'] * self.std['invsens_model_drp'])[use_region], 'x', 
-                    color = 'lightgreen', ms = 5, label = 'Selected for fitting') #selected regions 
-            if len(use_point) > 0:
-                self.ax.plot(self.std['wave'][use_point], (self.std['counts'] * self.std['invsens_model_drp'])[use_point], 'o', 
-                            color = 'darkgreen', ms = 10, label = 'Selected for fitting') #selected pixels 
+            self.ax.plot(self.std['wave'][invsens_region], (self.std['counts'] * self.std['invsens_model_drp'])[invsens_region], 'x', 
+                    color = 'lightgreen', ms = 5, label = 'Selected for invsens fitting') #selected regions 
+            self.ax.plot(self.std['wave'][telluric_region], (self.std['counts'] * self.std['invsens_model_drp'])[telluric_region], 'x', 
+                        color = 'darkgreen', ms = 5, label = 'Selected for telluric fitting') #selected pixels 
+            
+            if self.std['xknots'] is not None:
+                li = interp1d(self.std['wave'], self.std['counts'], kind = 'linear', bounds_error=False, fill_value = 0)
+                counts_knots = li(self.std['xknots'])
+                self.ax.scatter(self.std['xknots'], (self.std['yknots'] * counts_knots), marker='o', 
+                    color = 'cyan', s = 100, label = 'Knots for invsens fitting', edgecolors='k')
 
 
         self.ax.set_title('{0} - {1} - {2}'.format(self.std['frame'], self.std['name'], self.std['statenam']))
@@ -1619,7 +1647,10 @@ class KCWIViewerApp:
 
     def mask_skyline_region(self, wave, flag):
         """
-        Mask out the region with dense sky line and telluric absorption from flux calibration fitting
+        Mask out the region with dense sky line for invsens fitting. Telluric masks are subsequently applied by hand.
+        0 - masked
+        1 - good for invsens
+        2 - good for telluric
         """
         regions = [[6274, 6302],[6864.00, 6950.00], [7160.00, 7385.00], [7590, 7691],[8102, 8375],
                    [8943, 9225], [9300, 9400],
@@ -1629,8 +1660,7 @@ class KCWIViewerApp:
         mask = False
         for r in regions:
             mask |= (wave >= r[0]) & (wave <= r[1])
-
-        flag[mask] = 0
+        flag[mask & (flag != 0)] = 2
 
         return flag
         # [6864, 6935], [7164, 7345], [7591, 7694], [8131]]
@@ -1664,7 +1694,8 @@ class KCWIViewerApp:
         col3 = fits.Column(name = 'ivar', format = '1D', array = std_ivar)
 
         #mask used for telluric correction, bad pixels with mask = 0
-        mask = np.full(len(std_flux), 1, dtype = int)
+        #mask = np.full(len(std_flux), 1, dtype = int)
+        mask = (self.std['flag'] == 1) | (self.std['flag'] == 2)
         #the std spec in both DRP and pypeit seems to have some problems here; mask it out for g19b2b, should check for other stds
         # mask[(self.std['wave'] >=6310) & self.std['wave'] <= 6380] = 0 
         col4 = fits.Column(name = 'mask', format = '1K', array = mask)
@@ -1676,7 +1707,7 @@ class KCWIViewerApp:
         #need to update the header for pypeit input
         keys_1 = { 'DMODCLS': 'OneSpec ', 'DMODVER': '1.0.2   ', 'FLUXED': True, 
         'CHECKSUM': 'CG5BCD59CD5ACD59', 'DATASUM': '60558086'
-       }
+        }
         keys_2 = {'PYP_SPEC': 'keck_kcrm', 'PYPELINE': 'SlicerIFU',  'TARGET':newhdr['OBJECT'],
         'DISPNAME': self.std['invsens_hdr']['RGRATNAM'], 'decker': self.std['invsens_hdr']['IFUNAM'],  
         'binning': self.std['invsens_hdr']['BINNING'], 'FILENAME': '%s.fits'%frame,
@@ -1772,6 +1803,12 @@ class KCWIViewerApp:
                 #flag the region to False to be included in the fitting
                 else:
                     self.std['flag'][(self.std['wave']>= self.std['region_start']) & (self.std['wave']<= self.std['region_end'])] = 1
+                self.std['flag'] = self.mask_skyline_region(self.std['wave'], self.std['flag'])
+
+                # regenerate knots
+                xknots, yknots = self.gen_knots(self.std['wave'], self.std['invsens_data'], self.std['flag'])
+                self.std['xknots'] = xknots
+                self.std['yknots'] = yknots
                     
                 self.std['region_start'] = None #reset the starting point for the next input
                 self.plot_std(restore_limit = True) #update the std plot
@@ -1781,26 +1818,32 @@ class KCWIViewerApp:
             #find the index of the point closest to the mouse location
             # idx = np.argmin((self.std['wave'] - event.xdata)**2 + (self.std['counts'] * self.std['invsens_model_drp'] - event.ydata)**2) 
             idx = np.argmin(np.abs(self.std['wave'] - event.xdata))
-            self.std['flag'][idx] = 2
+            self.std['xknots'] = np.append(self.std['xknots'], self.std['wave'][idx])
+            self.std['yknots'] = np.append(self.std['yknots'], (self.std['invsens_data'])[idx])
+
+            #sort the knots
+            index_sort = np.argsort(self.std['xknots'])
+            self.std['xknots'] = self.std['xknots'][index_sort]
+            self.std['yknots'] = self.std['yknots'][index_sort]
+
             # print(self.std['use_ind'])
             self.plot_std(restore_limit = True)
         
         # delete single one continuum data point closest to the mouse location; should be used in the regions with dense sky features
         if event.key == 'd':
-            if np.sum(self.std['flag'] ==2) > 0:
-                # idx = np.argmin((self.std['wave'][self.std['use_ind']] - event.xdata)**2 + ((self.std['counts'] * self.std['invsens_model_drp'])[self.std['use_ind']] - event.ydata)**2) 
-                ind_point = np.where(self.std['flag'] ==2 )[0]
-                idx = np.argmin(np.abs(self.std['wave'][ind_point] - event.xdata))
-                self.std['flag'][ind_point[idx]] = 0
-                # self.std['use_ind'] = np.delete(self.std['use_ind'], idx)
-                self.plot_std(restore_limit = True)
+            # idx = np.argmin((self.std['wave'][self.std['use_ind']] - event.xdata)**2 + ((self.std['counts'] * self.std['invsens_model_drp'])[self.std['use_ind']] - event.ydata)**2) 
+            idx = np.argmin(np.abs(self.std['xknots'] - event.xdata))
+            self.std['xknots'] = np.delete(self.std['xknots'], idx)
+            self.std['yknots'] = np.delete(self.std['yknots'], idx)
+            # self.std['use_ind'] = np.delete(self.std['use_ind'], idx)
+            self.plot_std(restore_limit = True)
 
         #running the invsens fitting
         if event.key == 'f':
-            use = self.std['flag'] > 0
             # use[self.std['use_ind']] = True
             # print(len(use), self.std['wave'])
-            self.std['invsens_model'] = self.fit_bspline(self.std['wave'], self.std['invsens_data'], self.std['bspline_bkpt'], self.std['bspline_polyorder'], use)
+            self.std['invsens_model'] = self.fit_pchip(self.std['xknots'], self.std['yknots'], self.std['wave'])
+            #self.std['invsens_model'] = self.fit_bspline(self.std['wave'], self.std['invsens_data'], self.std['bspline_bkpt'], self.std['bspline_polyorder'], use)
             
             self.plot_std(restore_limit = True)
 
@@ -1873,6 +1916,43 @@ class KCWIViewerApp:
         bspline = splrep(x, y, k = k, task=-1, t=x[knots_idx])
 
         return splev(x_full, bspline)
+    
+    def gen_knots(self, x_full, y_full, flag, bkpt=100):
+        knots_idx = np.arange(0, x_full.size, bkpt)
+        use = (flag == 1)
+
+        xknots = x_full[knots_idx]
+        dx = xknots[1] - xknots[0]
+        yknots = np.zeros(xknots.size)
+        for i, xknot in enumerate(xknots):
+            index = (x_full >= xknot-dx/2) & (x_full < xknot+dx/2)
+            dps = y_full[index]
+            ups = use[index]
+            if np.sum(ups) > len(ups)/4:
+                yknots[i] = np.median(dps[ups])
+            else:
+                yknots[i] = np.nan
+        index = ~np.isnan(yknots)
+        xknots = xknots[index]
+        yknots = yknots[index]
+
+        return xknots, yknots
+    
+    def fit_pchip(self, xknots, yknots, x_full):
+        """
+        A simple PCHIP-fit wrapper for flux calibration
+
+        Args:
+            x (1D arr): x data
+            y (1D arr): y data
+            use (boolen arry, same shape as x and y): True for pixels used for fitting
+        """
+
+        index_sort = np.argsort(xknots)
+        pi = PchipInterpolator(xknots[index_sort], yknots[index_sort], extrapolate=True)
+        invsens_model = pi(x_full)
+
+        return invsens_model
 
 
     # def set_zap_skyseg(self):
