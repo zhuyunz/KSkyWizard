@@ -245,7 +245,20 @@ class KCWIViewerApp:
 
         #############Run button for the ZAP ############
         self.run_zap_button = tk.Button(self.tab2, text = 'Run ZAP', command = self.run_zap_precondition)
-        self.run_zap_button.grid(row =4, column =5, sticky='ew')
+        self.run_zap_button.grid(row =5, column =5, sticky='ew')
+
+        #############more options for flux calibration ############
+        self.use_invsens = tk.BooleanVar()
+        self.use_invsens_checkbox = tk.Checkbutton(self.tab2, text='Use invsens curve', variable=self.use_invsens,
+                                                  onvalue = True, offvalue = False, anchor='w')
+        self.use_invsens_checkbox.grid(row = 5, column = 0, sticky='ew')
+        self.use_invsens.set(True)
+
+        self.use_telluric = tk.BooleanVar()
+        self.use_telluric_checkbox = tk.Checkbutton(self.tab2, text='Use telluric curve', variable=self.use_telluric,
+                                                  onvalue = True, offvalue = False, anchor='w')
+        self.use_telluric_checkbox.grid(row = 5, column = 1, sticky='ew')
+        self.use_telluric.set(True)
 
         self.tab2.columnconfigure(0, weight=1)
         self.tab2.columnconfigure(1, weight=1)
@@ -257,6 +270,7 @@ class KCWIViewerApp:
         self.tab2.rowconfigure(2, weight=1)
         self.tab2.rowconfigure(3, weight=1)
         self.tab2.rowconfigure(4, weight=1)
+        self.tab2.rowconfigure(5, weight=1)
         
 
         
@@ -1350,12 +1364,22 @@ class KCWIViewerApp:
             #flux calibration and telluric correction
             if self.ctype == 'icubes':
                 self.insert_text(f'[INFO] The input datacube has been flux calibrated! Skip the flux calibration. Running telluric correction...')
-                mscal = 1. / tellmodel
+                if self.use_telluric.get():
+                    mscal = 1. / tellmodel
+                else:
+                    mscal = np.ones_like(tellmodel)
             else:
                 self.insert_text(f'[INFO] Running the flux calibration and telluric correction...') 
-                mscal = self.std['invsens_model'] * 1e16 / self.cleanhdu[0].header['XPOSURE'] #normalize by the exposure time
-                mscal, self.cleanhdu[0].header = kcwi_correct_extin(mscal, self.cleanhdu[0].header)
-                mscal = mscal[use] / tellmodel #include the telluric correction
+                if self.use_invsens.get():
+                    mscal = self.std['invsens_model'] * 1e16 / self.cleanhdu[0].header['XPOSURE'] #normalize by the exposure time
+                    mscal, self.cleanhdu[0].header = kcwi_correct_extin(mscal, self.cleanhdu[0].header)
+                else:
+                    mscal = np.ones_like(self.std['invsens_model'])
+
+                if self.use_telluric.get():
+                    mscal = mscal[use] / tellmodel #include the telluric correction
+                else:
+                    mscal = mscal[use]
 
             #reshpae the 1D mscal to 3D 
             mscal = mscal[:, np.newaxis, np.newaxis]
