@@ -1,11 +1,22 @@
 # KCWI Sky Wizard
-## Version: 09/10/2024
+**Version: 0.1.2024-12-19**
 
-## About The GUI
+---
 
-This GUI is designed to refine the sky subtraction, flux calibration, and telluric correction of the KCWI/KCRM data. The users would still have to reduce the data with the [`KCWI DRP`](https://kcwi-drp.readthedocs.io/en/latest/). 
-The sky subtraction is performed using the [`ZAP`](https://zap.readthedocs.io/en/latest/) package with a PCA approach. 
-The telluric correction makes use of the tellfit function of the [`Pypeit`](https://pypeit.readthedocs.io/en/release/telluric.html) package to derive the best-fit telluric model of the standard star.
+## About this tool
+
+The KCWI Sky Wizard is designed to refine:
+- **Sky subtraction**
+- **Flux calibration**
+- **Telluric correction**
+
+for KCWI/KCRM data. Users must first reduce the data using the [KCWI Data Reduction Pipeline](https://kcwi-drp.readthedocs.io/en/latest/).
+
+### Key Features:
+- **Sky Subtraction**: Utilizes the [`ZAP`](https://zap.readthedocs.io/en/latest/) package with a PCA approach.
+- **Telluric Correction**: Leverages the `tellfit` function of the [`PypeIt`](https://pypeit.readthedocs.io/en/release/telluric.html) package to derive a best-fit telluric model of the standard star.
+
+---
 
 ## Installation
 
@@ -16,7 +27,7 @@ The telluric correction makes use of the tellfit function of the [`Pypeit`](http
    conda activate kskywizard
    ```
 
-2. **Git clone this repository and install the required packages:**
+2. **Clone this repository and install the required packages:**
 
    ```bash
    git clone https://github.com/zhuyunz/KSkyWizard.git
@@ -30,12 +41,12 @@ The telluric correction makes use of the tellfit function of the [`Pypeit`](http
    pip install pypeit
    ```
 
-4. **In a separate directory, install zap_for_kcwi:**
+4. **Install `zap_for_kcwi` in a separate directory:**
 
    ```bash
    git clone https://github.com/jasonpeng17/zap_for_kcwi.git
    cd zap_for_kcwi
-   python setup.py install
+   pip install .
    ```
 
 5. **Return to the KSkyWizard directory, and run the setup code:**
@@ -48,7 +59,7 @@ The telluric correction makes use of the tellfit function of the [`Pypeit`](http
 
 ## Download the Mauna Kea telluric data
 
-This tool relies on PypeIt to perform telluric correction using preconstructed PCA models. Before running the tool, you need to download the correct telluric data and link it to this tool.
+To perform telluric correction, PypeIt uses preconstructed PCA models. Follow these steps to download and configure the data:
 
 1. **Download the telluric data:**
 
@@ -58,65 +69,131 @@ This tool relies on PypeIt to perform telluric correction using preconstructed P
 
 2. **Locate the telluric data.**
 
-   The telluric data is typically stored in `~/.pypeit/cache/download/url/`. Multiple files might be present in subdirectories. Each subdirectory contains a `contents` file (the actual data file) and a `url` file (an ASCII file linking to the download URL).
+   - The telluric data is typically stored in:
+   
+      `~/.pypeit/cache/download/url/`.
+      
+   - Each subdirectory contains:
+      - A `contents` file (the actual data file)
+      - A `url` file (an ASCII file linking to the download URL)
 
-   Find the path to the `contents` file and set it as the `telgridfile` variable in `setup.cfg`. If you install KSkyWizard under development mode, you can find the `setup.cfg' in /path/to/KSkyWizard/ For example:
+   - Find the path to the `contents` file, and set it as the `telgridfile` variable in `setup.cfg`, located at:
 
-   `telgridfile = ~/.pypeit/cache/download/url/5f17ecc1fcc921d6ec01e18d931ec2f8/contents`
+      `/path/to/KSkyWizard/setup.cfg`
+   
+   Example:
 
-   **Note**: **DO NOT** include quotation marks around the file path.
+   ```plaintext
+   telgridfile = ~/.pypeit/cache/download/url/5f17ecc1fcc921d6ec01e18d931ec2f8/contents
+   ```
+
+   **Important**: **DO NOT** include quotation marks around the file path.
 
 
 ## Prerequisites
 
-1. Install and run all the way through the [`KCWI DRP`](https://kcwi-drp.readthedocs.io/en/latest/). You can skip the sky subtraction as the GUI will handle it later.
+Run the KCWI Data Reduction Pipeline:
    
-   `reduce -r -f kr*fits -k -g`
+   - Process the data using [`KCWI DRP`](https://kcwi-drp.readthedocs.io/en/latest/), preferably following the [`KCWIKit` instruction](https://github.com/yuguangchen1/KcwiKit?tab=readme-ov-file#instuctions).
 
-2. Turn on the sky subtraction for the standard star to obtain the preliminary sensitivity curve. For example:
+   - (Optional) Skip the sky subtraction since this tool handles it, by turning on the `-k` flag for the science frames.
    
-   `reduce -r -f STD_FRAME.fits`
+      Eample:
 
-   or `reduce -r -l std.list`
+      ```bash
+      reduce -r -f kr*fits -k -g
+      ```
+
+      After the science frames, perform sky subtraction for the standard stars to obtain the preliminary sensitivity curves.
+      
+      For example:
+   
+      ```bash
+      reduce -r -f [Standard Star Frame].fits
+      ```
+
+      Alternative, create a `std.list` that contains all the standard star frames and run
+      
+      ```bash
+      reduce -r -l std.list
+      ```
 
 
 
 ## Usage
 
-### 1. Run the GUI
+### 1. Start KSkyWizard
 
-   You can run it either in the directory of the reduced data, or anywhere else and specify the input directory later in the GUI.
+   You can run this tool either in the directory containing the reduced data or from another directory, specifying the input directory later in the GUI.
    
    ```bash
    conda activate kskywizard
    kskywizard
    ```
 
-   A GUI window will pop up.
-<img width="1200" alt="image" src="https://github.com/user-attachments/assets/c297825f-c714-4b33-96a2-98eb615cedda">
+   A GUI window will appear.
+   <img width="1200" alt="image" src="https://github.com/user-attachments/assets/c297825f-c714-4b33-96a2-98eb615cedda">
 
 ### 2. Set the input and output directory
-Browse and select the input directory to be the `redux` directory where all the KCWI DRP outputs are stored. Also browse and select the output directory (please create a separate working directory to avoid overwriting the DRP output).
+
+- **Input Directory**: Browse and select the `redux` directory where all KCWI DRP outputs are stored.
+- **Output Directory**: Browse and select an output directory. **Tip**: Use a separate working directory to avoid overwriting the DRP output.
 
 ### 3. Flux calibration and telluric correction.
-  
-   Browse and select the *_invsens.fits of the DRP with the `Open DRP invsens` button.
-<img width="1198" alt="image" src="https://github.com/user-attachments/assets/9a3afb1e-26dc-43ae-8576-b629e50c32b1">
-   
-   If you are not happy with the default region, you can select the regions interactively. To activate this function, please first click the plotting canvas first.
-   - Put the mouse and press 'e' on each side of a region to exclude it from the fit
-   - Put the mouse and press 'i' on each side of a region to include it from the fit
-   - Put the mouse and press 'a' on a single data point to add it into the fit (highly recommend for regions beyond 9000A where most regions are contaminated by telluric)
-   - Put the mouse and press 'd' to delete the single data point mistakenly added earlier.
-   - Note: Please do not remove the start and end point of the spectrum to avoid running into problems.
-   - Press 'f' to re-fit the sensitivity function. You can iteratively choose the regions and re-fit the sensitivity function until you are happy with the model (the cyan line)
-     <img width="1193" alt="image" src="https://github.com/zhuyunz/KcwiKit/assets/33030986/a0125d01-9fe0-4bc0-807f-d857b89b0463">
-   - Press 'b' to reverse to the DRP's sensitivity function. If you don't want to run the 'f' option, simply press 'b' to register the DRP's curve first before proceeding.
-   - Press 't' to derive the telluric model. This step will take a while and the GUI will become frozen. Be patient until you see the output. You can skip this part if you don't want the telluric correction to be applied to your data.
-     <img width="1180" alt="image" src="https://github.com/zhuyunz/KcwiKit/assets/33030986/14e5ab89-2ac4-42b4-9c01-01be296a35b4">
-   - Press the `Save updated invsens` button if you are happy with the results.
 
-Sometimes, there are spikes in the spectrum of the standard star if you turn off the cosmic ray rejection in the DRP. As long as they are masked out from the fitting region, you don't need to worry about it.
+This process is divided into two steps:
+1. **Refining the Sensitivity Curve**: Adjust the sensitivity curve to remove the effects of telluric absorption and sky lines. This step involves interactive region selection and refinement.
+2. **Fitting the Telluric Features**: Use the `PypeIt` PCA model to fit the telluric features and finalize the calibration.
+
+#### Step 1: Load and Refine the Sensitivity Curve
+1. **Open the DRP Sensitivity File**: 
+   - Browse and select the `*_invsens.fits` file from the DRP outputs using the `Open DRP invsens` button.
+   
+   ![Select DRP Invsens File](https://github.com/user-attachments/assets/9a3afb1e-26dc-43ae-8576-b629e50c32b1)
+
+2. **Interactive Refinement**:
+   - To refine the sensitivity curve, click on the plotting canvas to activate the interaction mode.
+   - Use the following keyboard shortcuts to adjust regions:
+     - **`e`**: Exclude a region from the fit.
+     - **`i`**: Include a region in the fit.
+     Adjusting the regions will change the automatically generated spline knots, which can be further adjusted by
+     - **`a`**: Add a spline knot.
+     - **`d`**: Delete a spline knot.
+   
+   - **Re-fit the Sensitivity Function**:
+     - Press **`f`** to re-fit the sensitivity function iteratively until the model (cyan line) aligns well with the data.
+     
+     ![Interactive Refinement](https://github.com/zhuyunz/KcwiKit/assets/33030986/a0125d01-9fe0-4bc0-807f-d857b89b0463)
+
+   - **Use the DRP’s Default Curve**:
+     - Press **`b`** to revert to the DRP's original sensitivity curve if you prefer the DRP version.
+
+#### Step 2: Fit the Telluric Features
+1. **Derive the Telluric Model**:
+   - Press **`t`** to generate the telluric correction model. This process may take some time, and the GUI will become unresponsive during the calculation. Wait until the output appears.
+
+   ![Telluric Model Output](https://github.com/zhuyunz/KcwiKit/assets/33030986/14e5ab89-2ac4-42b4-9c01-01be296a35b4)
+
+2. **Save the Results**:
+   - Once satisfied with the sensitivity curve and telluric fit, press the `Save updated invsens` button to save the refined data.
+   These updated curves can be reloaded to the tool using the `Open updated invsens` button for future usage.
+
+---
+
+#### Tips:
+- **What to Include and Exclude During Fitting?**  
+  - For the **sensitivity curve fitting** (light green region):
+    - **Include**: Only the stellar continuum.  
+    - **Exclude**: 
+      - Residual cosmic rays.
+      - Stellar absorption lines (e.g., H-alpha).  
+      - Sky emission lines.  
+      - Telluric features.  
+  - For the **telluric fitting** (dark green region):
+    - **Include**: Known telluric features to ensure accurate modeling. For a summary of these features, refer to [Buton et al., 2013](https://www.aanda.org/articles/aa/full_html/2013/01/aa19834-12/aa19834-12.html).
+
+- **Iterative Refinement**:  
+  - All fitting can be adjusted and rerun until reaching a satisfactory result. 
 
 ### 4. Sky subtraction
 
