@@ -689,6 +689,10 @@ class KCWIViewerApp:
             else:
                 self.wlimg_wave_range = wlimg_wave_range_blue
 
+            # in case we are using RM or RH:
+            windex = (self.obswave > self.wlimg_wave_range[0]) & (self.obswave < self.wlimg_wave_range[1])
+            if np.sum(windex) ==0:
+                self.wlimg_wave_range = [self.scihdr['WAVGOOD0'], self.scihdr['WAVGOOD1']]
 
 
             #replace the bad pixels (flags >0) with NaNs
