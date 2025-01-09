@@ -244,7 +244,7 @@ class KCWIViewerApp:
 
 
         #############Run button for the ZAP ############
-        self.run_zap_button = tk.Button(self.tab2, text = 'Run ZAP', command = self.run_zap_precondition)
+        self.run_zap_button = tk.Button(self.tab2, text = 'Process', command = self.run_zap_precondition)
         self.run_zap_button.grid(row =5, column =5, sticky='ew')
 
         #############more options for flux calibration ############
@@ -259,6 +259,12 @@ class KCWIViewerApp:
                                                   onvalue = True, offvalue = False, anchor='w')
         self.use_telluric_checkbox.grid(row = 5, column = 1, sticky='ew')
         self.use_telluric.set(True)
+
+        self.use_zap = tk.BooleanVar()
+        self.use_zap_checkbox = tk.Checkbutton(self.tab2, text='Run ZAP', variable=self.use_zap,
+                                                  onvalue = True, offvalue = False, anchor='w')
+        self.use_zap_checkbox.grid(row = 5, column = 2, sticky='ew')
+        self.use_zap.set(True)
 
         self.tab2.columnconfigure(0, weight=1)
         self.tab2.columnconfigure(1, weight=1)
@@ -959,9 +965,12 @@ class KCWIViewerApp:
 
         #TODO: add the line to indicate different sky segments
 
-        #print the default sky segment                                                
-        self.print_sky_seg(self.zap['skyseg'], self.zap['cfwidth'])
-        self.skyseg_input_active = True
+        if self.use_zap.get():
+            #print the default sky segment                                                
+            self.print_sky_seg(self.zap['skyseg'], self.zap['cfwidth'])
+            self.skyseg_input_active = True
+        else:
+            self.run_zap() 
 
     def update_zap_skyseg(self, event):
         """
@@ -1105,69 +1114,73 @@ class KCWIViewerApp:
         else:
             ncpu = int(ncpu)
 
-        #In-field sky:
-        if self.index2 < 0:
-            self.insert_text(f'[INFO] Use in-field sky based on {self.prefix}_{self.mindex:05d}_zap_mask.fits')
-            self.skyhdu = None
-            maskpath = f'{self.output}/{self.prefix}_{self.mindex:05d}_zap_mask.fits'
-            zobj = zap.process(f'{self.output}/{self.prefix}_{self.index:05d}_{self.ctype}.fits',
-                  mask = maskpath, interactive = True, ncpu=ncpu,
-                  cfwidthSP = self.zap['cfwidth'], cfwidthSVD = self.zap['cfwidth'], skyseg = self.zap['skyseg'], zlevel = 'median')
+        if self.use_zap.get():
+            #In-field sky:
+            if self.index2 < 0:
+                self.insert_text(f'[INFO] Use in-field sky based on {self.prefix}_{self.mindex:05d}_zap_mask.fits')
+                self.skyhdu = None
+                maskpath = f'{self.output}/{self.prefix}_{self.mindex:05d}_zap_mask.fits'
+                zobj = zap.process(f'{self.output}/{self.prefix}_{self.index:05d}_{self.ctype}.fits',
+                    mask = maskpath, interactive = True, ncpu=ncpu,
+                    cfwidthSP = self.zap['cfwidth'], cfwidthSVD = self.zap['cfwidth'], skyseg = self.zap['skyseg'], zlevel = 'median')
 
-        #Off-field sky
-        if self.index2 > 0:
-            self.insert_text(f'[INFO] Use off-field sky {self.prefix}_{self.index2:05d}. Mask file -  {self.prefix}__{self.index2:05d}_zap_mask.fits')
-            self.skyhdu = fits.open(f'{self.output}/{self.prefix}_{self.index2:05d}_{self.ctype}.fits')
-            maskpath = f'{self.output}/{self.prefix}_{self.index2:05d}_zap_mask.fits'
-            extSVD = zap.SVDoutput(f'{self.output}/{self.prefix}_{self.index2:05d}_{self.ctype}.fits',
-                       mask = maskpath, ncpu=ncpu,
-                        skyseg = self.zap['skyseg'], zlevel = 'median')
-            zobj = zap.process(f'{self.output}/{self.prefix}_{self.index:05d}_{self.ctype}.fits', extSVD=extSVD, interactive = True,
-                  cfwidthSP = self.zap['cfwidth'], ncpu=ncpu, 
-                   skyseg = self.zap['skyseg'])
+            #Off-field sky
+            if self.index2 > 0:
+                self.insert_text(f'[INFO] Use off-field sky {self.prefix}_{self.index2:05d}. Mask file -  {self.prefix}__{self.index2:05d}_zap_mask.fits')
+                self.skyhdu = fits.open(f'{self.output}/{self.prefix}_{self.index2:05d}_{self.ctype}.fits')
+                maskpath = f'{self.output}/{self.prefix}_{self.index2:05d}_zap_mask.fits'
+                extSVD = zap.SVDoutput(f'{self.output}/{self.prefix}_{self.index2:05d}_{self.ctype}.fits',
+                        mask = maskpath, ncpu=ncpu,
+                            skyseg = self.zap['skyseg'], zlevel = 'median')
+                zobj = zap.process(f'{self.output}/{self.prefix}_{self.index:05d}_{self.ctype}.fits', extSVD=extSVD, interactive = True,
+                    cfwidthSP = self.zap['cfwidth'], ncpu=ncpu, 
+                    skyseg = self.zap['skyseg'])
 
-        nsig = 3
-        # skycube = zobj.cube - zobj.cleancube
-        # ### if the object pixels are either over-subtracted or under-subtracted near Halpha (>3sigma), replace the sky pixel value with the median
-        # mask = fits.getdata(maskpath) #get the mask to avoid the edge pixel. Should be similar if using the off-field sky
-        # use = np.abs(mask - 1) > 1e-6 #mask = 1 for edge mask
-        # skycube_clipped = sigma_clip(skycube[:,use], sigma = nsig, axis = 1)
-        # # skycube_clipped = sigma_clip(skycube[:,use], axis = 1)
+            nsig = 3
+            # skycube = zobj.cube - zobj.cleancube
+            # ### if the object pixels are either over-subtracted or under-subtracted near Halpha (>3sigma), replace the sky pixel value with the median
+            # mask = fits.getdata(maskpath) #get the mask to avoid the edge pixel. Should be similar if using the off-field sky
+            # use = np.abs(mask - 1) > 1e-6 #mask = 1 for edge mask
+            # skycube_clipped = sigma_clip(skycube[:,use], sigma = nsig, axis = 1)
+            # # skycube_clipped = sigma_clip(skycube[:,use], axis = 1)
 
-        # median_cube = np.zeros_like(skycube) #3D median cube
-        # std_cube = np.zeros_like(skycube) #3D STD cube
-        # npix = np.sum(use)
-        # median_cube[:, use] = np.repeat(np.nanmedian(skycube_clipped, axis = 1).data, npix).reshape(len(skycube), npix)
-        # std_cube[:, use] = np.repeat(np.nanstd(skycube_clipped, axis = 1).data, npix).reshape(len(skycube), npix)
-        # #find and replace the 3sigma outlier
-        # bpm = np.where((np.abs(skycube - median_cube) > nsig*std_cube) & (median_cube > 0))
-        # # bpm = np.where(np.abs(skycube - median_cube) > nsig*std_cube)
-        # skycube[bpm] = median_cube[bpm]
-        # cleancube = zobj.cube - skycube
+            # median_cube = np.zeros_like(skycube) #3D median cube
+            # std_cube = np.zeros_like(skycube) #3D STD cube
+            # npix = np.sum(use)
+            # median_cube[:, use] = np.repeat(np.nanmedian(skycube_clipped, axis = 1).data, npix).reshape(len(skycube), npix)
+            # std_cube[:, use] = np.repeat(np.nanstd(skycube_clipped, axis = 1).data, npix).reshape(len(skycube), npix)
+            # #find and replace the 3sigma outlier
+            # bpm = np.where((np.abs(skycube - median_cube) > nsig*std_cube) & (median_cube > 0))
+            # # bpm = np.where(np.abs(skycube - median_cube) > nsig*std_cube)
+            # skycube[bpm] = median_cube[bpm]
+            # cleancube = zobj.cube - skycube
 
-        skycube0 = zobj.cube - zobj.cleancube
-        skycube = skycube0.copy()
+            skycube0 = zobj.cube - zobj.cleancube
+            skycube = skycube0.copy()
 
-        mask = fits.getdata(maskpath) #get the mask to avoid the edge pixel. Should be similar if using the off-field sky
-        use = np.abs(mask - 1) > 1e-6 #mask = 1 for edge mask
-        skycube[:,~use] = np.nan
-        skycube_clipped = sigma_clip(skycube, sigma = nsig, axis = (1,2))
-        median_sky = np.ma.median(skycube_clipped, axis = (1,2)).data
-        median_cube = median_sky[:, np.newaxis, np.newaxis] * np.ones((1, np.shape(skycube)[1], np.shape(skycube)[2]))
-        skycube[skycube_clipped.mask] = median_cube[skycube_clipped.mask]
-        skycube[:, ~use] = skycube0[:, ~use]
-        cleancube = zobj.cube - skycube
+            mask = fits.getdata(maskpath) #get the mask to avoid the edge pixel. Should be similar if using the off-field sky
+            use = np.abs(mask - 1) > 1e-6 #mask = 1 for edge mask
+            skycube[:,~use] = np.nan
+            skycube_clipped = sigma_clip(skycube, sigma = nsig, axis = (1,2))
+            median_sky = np.ma.median(skycube_clipped, axis = (1,2)).data
+            median_cube = median_sky[:, np.newaxis, np.newaxis] * np.ones((1, np.shape(skycube)[1], np.shape(skycube)[2]))
+            skycube[skycube_clipped.mask] = median_cube[skycube_clipped.mask]
+            skycube[:, ~use] = skycube0[:, ~use]
+            cleancube = zobj.cube - skycube
 
-        # save the output cube
-        self.cleanhdu = self.scihdu.copy()
-        self.cleanhdu.append(self.scihdu[0])
-        self.cleanhdu[-1].name = 'UNZAPPED'
-        self.cleanhdu[0].data = cleancube
-        # bad = np.where(self.cleanhdu['FLAGS'].data >=8)
-        # self.cleanhdu[0].data[bad] = 0
-        skyhdu = fits.ImageHDU(data=skycube, header=self.scihdu[0].header)
-        skyhdu.name = 'SKYMODEL_ZAP'
-        self.cleanhdu.append(skyhdu)
+            # save the output cube
+            self.cleanhdu = self.scihdu.copy()
+            self.cleanhdu.append(self.scihdu[0])
+            self.cleanhdu[-1].name = 'UNZAPPED'
+            self.cleanhdu[0].data = cleancube
+            # bad = np.where(self.cleanhdu['FLAGS'].data >=8)
+            # self.cleanhdu[0].data[bad] = 0
+            skyhdu = fits.ImageHDU(data=skycube, header=self.scihdu[0].header)
+            skyhdu.name = 'SKYMODEL_ZAP'
+            self.cleanhdu.append(skyhdu)
+        else:
+            self.cleanhdu = self.scihdu.copy()
+
         check_dir(self.output)
         self.cleanhdu.writeto(f'{self.output}/{self.prefix}_{self.index:05d}_zap_{self.ctype}.fits', overwrite = True)
 
@@ -1253,10 +1266,18 @@ class KCWIViewerApp:
                                     image_size[2]+2*padding_x), dtype=np.uint8)
             output_flags = np.zeros((image_size[0], image_size[1] + 2*padding_y,
                                     image_size[2] + 2 * padding_x), dtype=np.uint8)
-            output_skymodel_zap = np.zeros((image_size[0], image_size[1]+2*padding_y,
-                                    image_size[2]+2*padding_x), dtype=np.float64)
-            output_unzapped = np.zeros((image_size[0], image_size[1]+2*padding_y,
-                                    image_size[2]+2*padding_x), dtype=np.float64)
+
+            if 'SKYMODEL_ZAP' in [hdu.name for hdu in self.cleanhdu]:
+                output_skymodel_zap = np.zeros((image_size[0], image_size[1]+2*padding_y,
+                                        image_size[2]+2*padding_x), dtype=np.float64)
+            else:
+                output_skymodel_zap = None
+            
+            if 'UNZAPPED' in [hdu.name for hdu in self.cleanhdu]:
+                output_unzapped = np.zeros((image_size[0], image_size[1]+2*padding_y,
+                                        image_size[2]+2*padding_x), dtype=np.float64)
+            else:
+                output_unzapped = None
             
             if 'NOSKYSUB' in [hdu.name for hdu in self.cleanhdu]:
                 output_noskysub = np.zeros((image_size[0],
@@ -1281,11 +1302,13 @@ class KCWIViewerApp:
             output_flags[:, padding_y:(padding_y+image_size[1]),
                         padding_x:(padding_x+image_size[2])] = self.cleanhdu['FLAGS'].data
             
-            output_unzapped[:, padding_y:(padding_y+image_size[1]),
-                        padding_x:(padding_x+image_size[2])] = self.cleanhdu['UNZAPPED'].data
+            if output_unzapped is not None:
+                output_unzapped[:, padding_y:(padding_y+image_size[1]),
+                            padding_x:(padding_x+image_size[2])] = self.cleanhdu['UNZAPPED'].data
             
-            output_skymodel_zap[:, padding_y:(padding_y+image_size[1]),
-                        padding_x:(padding_x+image_size[2])] = self.cleanhdu['SKYMODEL_ZAP'].data
+            if output_skymodel_zap is not None:
+                output_skymodel_zap[:, padding_y:(padding_y+image_size[1]),
+                            padding_x:(padding_x+image_size[2])] = self.cleanhdu['SKYMODEL_ZAP'].data
             
             if output_noskysub is not None:
                 output_noskysub[:, padding_y:(padding_y + image_size[1]),
@@ -1310,10 +1333,12 @@ class KCWIViewerApp:
                                                                 x_shift), order=1, mode = 'constant', cval=128))
                 output_flags[j, :, :] = np.ceil(shift(output_flags[j, :, :], (y_shift,
                                                                   x_shift), order=1, mode = 'constant', cval=128))
-                output_unzapped[j, :, :] = shift(output_unzapped[j, :, :],
-                                            (y_shift, x_shift), order = DAR_shift_order)
-                output_skymodel_zap[j, :, :] = shift(output_skymodel_zap[j, :, :],
-                                            (y_shift, x_shift), order = DAR_shift_order)
+                if output_unzapped is not None:
+                    output_unzapped[j, :, :] = shift(output_unzapped[j, :, :],
+                                                (y_shift, x_shift), order = DAR_shift_order)
+                if output_skymodel_zap is not None:
+                    output_skymodel_zap[j, :, :] = shift(output_skymodel_zap[j, :, :],
+                                                (y_shift, x_shift), order = DAR_shift_order)
                 if output_noskysub is not None:
                     output_noskysub[j, :, :] = shift(output_noskysub[j, :, :],
                                                     (y_shift, x_shift), order = DAR_shift_order)
@@ -1323,9 +1348,10 @@ class KCWIViewerApp:
             self.cleanhdu['UNCERT'].data = output_stddev
             self.cleanhdu['MASK'].data = output_mask
             self.cleanhdu['FLAGS'].data = output_flags
-            self.cleanhdu['UNZAPPED'].data = output_unzapped
-            self.cleanhdu['SKYMODEL_ZAP'].data = output_skymodel_zap
-
+            if output_unzapped is not None:
+                self.cleanhdu['UNZAPPED'].data = output_unzapped
+            if output_skymodel_zap is not None:
+                self.cleanhdu['SKYMODEL_ZAP'].data = output_skymodel_zap
             if output_noskysub is not None:
                 self.cleanhdu['NOSKYSUB'].data = output_noskysub
 
@@ -1388,15 +1414,24 @@ class KCWIViewerApp:
             self.cleanhdu_flux = self.cleanhdu.copy() #flux-calibrated cube
             self.cleanhdu_flux[0].data *= mscal
             self.cleanhdu_flux['UNCERT'].data *= mscal
-            self.cleanhdu_flux['UNZAPPED'].data *= mscal
-            self.cleanhdu_flux['SKYMODEL_ZAP'].data *= mscal
             self.cleanhdu_flux[0].header['BUNIT'] = '1e-16 erg / (Angstrom cm2 s)'
             self.cleanhdu_flux[0].header['STDCOR'] = (True, 'std corrected?')
             self.cleanhdu_flux[0].header['MSFILE'] = ('{}_invsens_updated.fits'.format(self.std['frame']), 'Master std filename')
+            
             try:
                 # This header may not be necessary? -YC
                 self.cleanhdu_flux[0].header['MSIMNO'] = (int(self.std['frame'][-5:]), 'master std image number')
             except:
+                pass
+
+            try:
+                self.cleanhdu_flux['UNZAPPED'].data *= mscal
+            except KeyError:
+                pass
+
+            try:
+                self.cleanhdu_flux['SKYMODEL_ZAP'].data *= mscal
+            except KeyError:
                 pass
 
             try:
@@ -1431,11 +1466,18 @@ class KCWIViewerApp:
 
 
         #plot the spectrum
-        self.plot_spec_dict = {'datacube': self.cleanhdu_flux[0].data, 'errcube': self.cleanhdu_flux['UNCERT'].data,
-                                'flagcube': self.cleanhdu_flux['FLAGS'].data, 
-                                'z': self.redshift, 'yunit': self.cleanhdu_flux[0].header['BUNIT'], 
-                                'skycube': self.cleanhdu_flux['UNZAPPED'].data, 'unzapped_skycube': True,
-                                'restore_limit': False, 'show_lines': True}
+        if 'UNZAPPED' in [hdu.name for hdu in self.cleanhdu]:
+            self.plot_spec_dict = {'datacube': self.cleanhdu_flux[0].data, 'errcube': self.cleanhdu_flux['UNCERT'].data,
+                                    'flagcube': self.cleanhdu_flux['FLAGS'].data, 
+                                    'z': self.redshift, 'yunit': self.cleanhdu_flux[0].header['BUNIT'], 
+                                    'skycube': self.cleanhdu_flux['UNZAPPED'].data, 'unzapped_skycube': True,
+                                    'restore_limit': False, 'show_lines': True}
+        else:
+            self.plot_spec_dict = {'datacube': self.cleanhdu_flux[0].data, 'errcube': self.cleanhdu_flux['UNCERT'].data,
+                                    'flagcube': self.cleanhdu_flux['FLAGS'].data, 
+                                    'z': self.redshift, 'yunit': self.cleanhdu_flux[0].header['BUNIT'], 
+                                    'skycube': None, 'unzapped_skycube': False,
+                                    'restore_limit': False, 'show_lines': True}
 
         self.insert_text(f'[INFO] ZAP Done for {self.prefix}_{self.index:05d}!')
         self.plot_spectrum(**self.plot_spec_dict)
