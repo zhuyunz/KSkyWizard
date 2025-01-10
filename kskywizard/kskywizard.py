@@ -55,9 +55,10 @@ This version is still under development. If you run into any issue, please drop 
 # initial_dir = '/scr/zzhuang/keck_obs/kcwi'
 initial_dir = os.getcwd()
 
-#Set it to the place where you put the TelFit file from pypeit. Can download it via "pypeit_install_telluric TelFit_MaunaKea_3100_26100_R20000.fits"
+# Now the telgridfile should be specified in the setup.cfg
+# Set it to the place where you put the TelFit file from pypeit. Can download it via "pypeit_install_telluric TelFit_MaunaKea_3100_26100_R20000.fits"
 #Please do not download the TelPCA file (the default of Pypeit). The updated TelPCA file would cause weird shape in the telluric model so please stick to TelFit_MaunaKea!
-telgridfile = '/Users/yuguangchen/.pypeit/cache/download/url/5f17ecc1fcc921d6ec01e18d931ec2f8/content'
+# telgridfile = '/Users/yuguangchen/.pypeit/cache/download/url/5f17ecc1fcc921d6ec01e18d931ec2f8/content'
 
 #pick this region to generate the white-lighted image because sky lines are much stronger elsewhere. 
 # TODO: Can also make it as an input or variable parameter in the GUI
@@ -702,6 +703,11 @@ class KCWIViewerApp:
         else:
             self.insert_text(f"[ERROR] Wrong science frame! Need to set it to a positive integer. Check the KCWI log for the frame number!")
 
+        #replace the edge pixels with NaNs
+        badpix = np.where(np.mean(self.scihdu['FLAGS'].data, axis = 0) > 100)
+        self.scihdu[0].data[:, badpix[0], badpix[1]] = np.nan
+        self.scihdu['UNCERT'].data[:, badpix[0], badpix[1]] = np.nan
+
         # self.z = 0
         if self.index2 > 0:
             self.skypath = f'{base}/{self.prefix}_{self.index2:05d}_{self.ctype}.fits'
@@ -715,6 +721,13 @@ class KCWIViewerApp:
                 self.insert_text(f"[INFO] Loading the cropped DRP-reduced sky frame {self.prefix}_{self.index2:05d} for {self.prefix}_{self.index:05d}")
             # self.plot_spectrum(self.scihdu[0].data, hdu_sky=self.skyhdu[0].data, 
             #                     yunit = self.scihdr['BUNIT']) #plot the spectrum of the central region (x = [12, 22], y = [43, 53]; 10x10 box) for a quick look. 
+
+            #replace bad pixels with NaNs
+            # badpix = np.where(self.skyhdu['FLAGS'].data > 0)
+            # self.skyhdu['FLAGS'].data[badpix] = np.nan
+            badpix = np.where(np.mean(self.skyhdu['FLAGS'].data, axis = 0) > 100)
+            self.skyhdu[0].data[:, badpix[0], badpix[1]] = np.nan
+
             self.plot_spec_dict = {'datacube': self.scihdu[0].data, 'errcube': self.scihdu['UNCERT'].data,
                                     'flagcube': self.scihdu['FLAGS'].data, 
                                     'z': 0.0,
@@ -879,7 +892,7 @@ class KCWIViewerApp:
         # errcube[flagcube > 0] = np.nan
 
         # spec = np.nanmean(datacube[:, yrange[0]:yrange[1], xrange[0]: xrange[1]], axis = (1,2))
-        spec = np.mean(datacube[:, yrange[0]:yrange[1], xrange[0]: xrange[1]], axis = (1,2))
+        spec = np.nanmean(datacube[:, yrange[0]:yrange[1], xrange[0]: xrange[1]], axis = (1,2))
         err = np.sqrt(np.nansum(errcube[:, yrange[0]:yrange[1], xrange[0]: xrange[1]]**2, axis = (1,2))) / np.sum(np.isfinite(errcube[:, yrange[0]:yrange[1], xrange[0]: xrange[1]]), axis = (1,2))
         self.ax.step(self.obswave / (1+z), spec, color ='k', lw = 1, label = 'sci spec')
         self.ax.step(self.obswave / (1+z), err, color ='grey', lw = 1, label = 'sci err')
