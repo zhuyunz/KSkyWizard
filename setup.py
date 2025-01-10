@@ -43,7 +43,8 @@ setuptools.setup(name=NAME,
         'tk',
         'scipy',
         'ref_index',
-        'pyregion',
+        #'pyregion',
+        'regions',
         'pypeit~=1.16']
 )
 

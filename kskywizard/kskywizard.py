@@ -20,9 +20,11 @@ from astropy.io import fits
 from astropy.table import Table
 from astropy.stats import sigma_clip
 import os 
-import pyregion
+#import pyregion
+from regions import Regions
 import re
 from scipy.interpolate import interp1d, splrep, splev
+from scipy.interpolate import PchipInterpolator
 from astropy.coordinates import SkyCoord
 import astropy.units as u
 from typing import List
@@ -242,8 +244,27 @@ class KCWIViewerApp:
 
 
         #############Run button for the ZAP ############
-        self.run_zap_button = tk.Button(self.tab2, text = 'Run ZAP', command = self.run_zap_precondition)
-        self.run_zap_button.grid(row =4, column =5, sticky='ew')
+        self.run_zap_button = tk.Button(self.tab2, text = 'Process', command = self.run_zap_precondition)
+        self.run_zap_button.grid(row =5, column =5, sticky='ew')
+
+        #############more options for flux calibration ############
+        self.use_invsens = tk.BooleanVar()
+        self.use_invsens_checkbox = tk.Checkbutton(self.tab2, text='Use invsens curve', variable=self.use_invsens,
+                                                  onvalue = True, offvalue = False, anchor='w')
+        self.use_invsens_checkbox.grid(row = 5, column = 0, sticky='ew')
+        self.use_invsens.set(True)
+
+        self.use_telluric = tk.BooleanVar()
+        self.use_telluric_checkbox = tk.Checkbutton(self.tab2, text='Use telluric curve', variable=self.use_telluric,
+                                                  onvalue = True, offvalue = False, anchor='w')
+        self.use_telluric_checkbox.grid(row = 5, column = 1, sticky='ew')
+        self.use_telluric.set(True)
+
+        self.use_zap = tk.BooleanVar()
+        self.use_zap_checkbox = tk.Checkbutton(self.tab2, text='Run ZAP', variable=self.use_zap,
+                                                  onvalue = True, offvalue = False, anchor='w')
+        self.use_zap_checkbox.grid(row = 5, column = 2, sticky='ew')
+        self.use_zap.set(True)
 
         self.tab2.columnconfigure(0, weight=1)
         self.tab2.columnconfigure(1, weight=1)
@@ -255,6 +276,7 @@ class KCWIViewerApp:
         self.tab2.rowconfigure(2, weight=1)
         self.tab2.rowconfigure(3, weight=1)
         self.tab2.rowconfigure(4, weight=1)
+        self.tab2.rowconfigure(5, weight=1)
         
 
         
@@ -667,6 +689,10 @@ class KCWIViewerApp:
             else:
                 self.wlimg_wave_range = wlimg_wave_range_blue
 
+            # in case we are using RM or RH:
+            windex = (self.obswave > self.wlimg_wave_range[0]) & (self.obswave < self.wlimg_wave_range[1])
+            if np.sum(windex) ==0:
+                self.wlimg_wave_range = [self.scihdr['WAVGOOD0'], self.scihdr['WAVGOOD1']]
 
 
             #replace the bad pixels (flags >0) with NaNs
@@ -777,10 +803,26 @@ class KCWIViewerApp:
             self.insert_text(f"[ERROR] Region file {self.prefix}_{mindex:05d}.reg not exists!")
         else:
             self.insert_text(f"[INFO] Reading region file {self.prefix}_{mindex:05d}.reg for {self.prefix}_{self.index:05d}")
-            r = pyregion.open(region_path)
-            region_mask  = r.get_mask(hdu=mhdu[0])
+            
+            # Construct binary masks from the region file
+            with open(region_path, 'r') as f:
+                # Read it out as a string
+                regstr = f.read()
+                
+                # Check if the region file is in physical coordinates
+                if 'physical' in regstr:
+                    self.insert_text("[Warning] 'physical' coordinates no longer supported by regions. Replacing with 'image'")
+                    regstr = regstr.replace('physical', 'image')
+
+                r = Regions.parse(regstr, format='ds9')
+                region_mask = None
+                for region in r.regions:
+                    if region_mask is None:
+                        region_mask = region.to_mask().to_image(mhdu[0].shape).astype(bool)
+                    else:
+                        region_mask = region_mask | region.to_mask().to_image(mhdu[0].shape).astype(bool)
+
             allmask = np.zeros_like(mhdu[0].data)
-            # allmask[edgemask | region_mask] = 1
             allmask[region_mask] = 2
             allmask[edgemask] = 1
             maskhdu = fits.PrimaryHDU(allmask, header = mhdu[0].header)
@@ -927,9 +969,12 @@ class KCWIViewerApp:
 
         #TODO: add the line to indicate different sky segments
 
-        #print the default sky segment                                                
-        self.print_sky_seg(self.zap['skyseg'], self.zap['cfwidth'])
-        self.skyseg_input_active = True
+        if self.use_zap.get():
+            #print the default sky segment                                                
+            self.print_sky_seg(self.zap['skyseg'], self.zap['cfwidth'])
+            self.skyseg_input_active = True
+        else:
+            self.run_zap() 
 
     def update_zap_skyseg(self, event):
         """
@@ -1073,69 +1118,73 @@ class KCWIViewerApp:
         else:
             ncpu = int(ncpu)
 
-        #In-field sky:
-        if self.index2 < 0:
-            self.insert_text(f'[INFO] Use in-field sky based on {self.prefix}_{self.mindex:05d}_zap_mask.fits')
-            self.skyhdu = None
-            maskpath = f'{self.output}/{self.prefix}_{self.mindex:05d}_zap_mask.fits'
-            zobj = zap.process(f'{self.output}/{self.prefix}_{self.index:05d}_{self.ctype}.fits',
-                  mask = maskpath, interactive = True, ncpu=ncpu,
-                  cfwidthSP = self.zap['cfwidth'], cfwidthSVD = self.zap['cfwidth'], skyseg = self.zap['skyseg'], zlevel = 'median')
+        if self.use_zap.get():
+            #In-field sky:
+            if self.index2 < 0:
+                self.insert_text(f'[INFO] Use in-field sky based on {self.prefix}_{self.mindex:05d}_zap_mask.fits')
+                self.skyhdu = None
+                maskpath = f'{self.output}/{self.prefix}_{self.mindex:05d}_zap_mask.fits'
+                zobj = zap.process(f'{self.output}/{self.prefix}_{self.index:05d}_{self.ctype}.fits',
+                    mask = maskpath, interactive = True, ncpu=ncpu,
+                    cfwidthSP = self.zap['cfwidth'], cfwidthSVD = self.zap['cfwidth'], skyseg = self.zap['skyseg'], zlevel = 'median')
 
-        #Off-field sky
-        if self.index2 > 0:
-            self.insert_text(f'[INFO] Use off-field sky {self.prefix}_{self.index2:05d}. Mask file -  {self.prefix}__{self.index2:05d}_zap_mask.fits')
-            self.skyhdu = fits.open(f'{self.output}/{self.prefix}_{self.index2:05d}_{self.ctype}.fits')
-            maskpath = f'{self.output}/{self.prefix}_{self.index2:05d}_zap_mask.fits'
-            extSVD = zap.SVDoutput(f'{self.output}/{self.prefix}_{self.index2:05d}_{self.ctype}.fits',
-                       mask = maskpath, ncpu=ncpu,
-                        skyseg = self.zap['skyseg'], zlevel = 'median')
-            zobj = zap.process(f'{self.output}/{self.prefix}_{self.index:05d}_{self.ctype}.fits', extSVD=extSVD, interactive = True,
-                  cfwidthSP = self.zap['cfwidth'], ncpu=ncpu, 
-                   skyseg = self.zap['skyseg'])
+            #Off-field sky
+            if self.index2 > 0:
+                self.insert_text(f'[INFO] Use off-field sky {self.prefix}_{self.index2:05d}. Mask file -  {self.prefix}__{self.index2:05d}_zap_mask.fits')
+                self.skyhdu = fits.open(f'{self.output}/{self.prefix}_{self.index2:05d}_{self.ctype}.fits')
+                maskpath = f'{self.output}/{self.prefix}_{self.index2:05d}_zap_mask.fits'
+                extSVD = zap.SVDoutput(f'{self.output}/{self.prefix}_{self.index2:05d}_{self.ctype}.fits',
+                        mask = maskpath, ncpu=ncpu,
+                            skyseg = self.zap['skyseg'], zlevel = 'median')
+                zobj = zap.process(f'{self.output}/{self.prefix}_{self.index:05d}_{self.ctype}.fits', extSVD=extSVD, interactive = True,
+                    cfwidthSP = self.zap['cfwidth'], ncpu=ncpu, 
+                    skyseg = self.zap['skyseg'])
 
-        nsig = 3
-        # skycube = zobj.cube - zobj.cleancube
-        # ### if the object pixels are either over-subtracted or under-subtracted near Halpha (>3sigma), replace the sky pixel value with the median
-        # mask = fits.getdata(maskpath) #get the mask to avoid the edge pixel. Should be similar if using the off-field sky
-        # use = np.abs(mask - 1) > 1e-6 #mask = 1 for edge mask
-        # skycube_clipped = sigma_clip(skycube[:,use], sigma = nsig, axis = 1)
-        # # skycube_clipped = sigma_clip(skycube[:,use], axis = 1)
+            nsig = 3
+            # skycube = zobj.cube - zobj.cleancube
+            # ### if the object pixels are either over-subtracted or under-subtracted near Halpha (>3sigma), replace the sky pixel value with the median
+            # mask = fits.getdata(maskpath) #get the mask to avoid the edge pixel. Should be similar if using the off-field sky
+            # use = np.abs(mask - 1) > 1e-6 #mask = 1 for edge mask
+            # skycube_clipped = sigma_clip(skycube[:,use], sigma = nsig, axis = 1)
+            # # skycube_clipped = sigma_clip(skycube[:,use], axis = 1)
 
-        # median_cube = np.zeros_like(skycube) #3D median cube
-        # std_cube = np.zeros_like(skycube) #3D STD cube
-        # npix = np.sum(use)
-        # median_cube[:, use] = np.repeat(np.nanmedian(skycube_clipped, axis = 1).data, npix).reshape(len(skycube), npix)
-        # std_cube[:, use] = np.repeat(np.nanstd(skycube_clipped, axis = 1).data, npix).reshape(len(skycube), npix)
-        # #find and replace the 3sigma outlier
-        # bpm = np.where((np.abs(skycube - median_cube) > nsig*std_cube) & (median_cube > 0))
-        # # bpm = np.where(np.abs(skycube - median_cube) > nsig*std_cube)
-        # skycube[bpm] = median_cube[bpm]
-        # cleancube = zobj.cube - skycube
+            # median_cube = np.zeros_like(skycube) #3D median cube
+            # std_cube = np.zeros_like(skycube) #3D STD cube
+            # npix = np.sum(use)
+            # median_cube[:, use] = np.repeat(np.nanmedian(skycube_clipped, axis = 1).data, npix).reshape(len(skycube), npix)
+            # std_cube[:, use] = np.repeat(np.nanstd(skycube_clipped, axis = 1).data, npix).reshape(len(skycube), npix)
+            # #find and replace the 3sigma outlier
+            # bpm = np.where((np.abs(skycube - median_cube) > nsig*std_cube) & (median_cube > 0))
+            # # bpm = np.where(np.abs(skycube - median_cube) > nsig*std_cube)
+            # skycube[bpm] = median_cube[bpm]
+            # cleancube = zobj.cube - skycube
 
-        skycube0 = zobj.cube - zobj.cleancube
-        skycube = skycube0.copy()
+            skycube0 = zobj.cube - zobj.cleancube
+            skycube = skycube0.copy()
 
-        mask = fits.getdata(maskpath) #get the mask to avoid the edge pixel. Should be similar if using the off-field sky
-        use = np.abs(mask - 1) > 1e-6 #mask = 1 for edge mask
-        skycube[:,~use] = np.nan
-        skycube_clipped = sigma_clip(skycube, sigma = nsig, axis = (1,2))
-        median_sky = np.ma.median(skycube_clipped, axis = (1,2)).data
-        median_cube = median_sky[:, np.newaxis, np.newaxis] * np.ones((1, np.shape(skycube)[1], np.shape(skycube)[2]))
-        skycube[skycube_clipped.mask] = median_cube[skycube_clipped.mask]
-        skycube[:, ~use] = skycube0[:, ~use]
-        cleancube = zobj.cube - skycube
+            mask = fits.getdata(maskpath) #get the mask to avoid the edge pixel. Should be similar if using the off-field sky
+            use = np.abs(mask - 1) > 1e-6 #mask = 1 for edge mask
+            skycube[:,~use] = np.nan
+            skycube_clipped = sigma_clip(skycube, sigma = nsig, axis = (1,2))
+            median_sky = np.ma.median(skycube_clipped, axis = (1,2)).data
+            median_cube = median_sky[:, np.newaxis, np.newaxis] * np.ones((1, np.shape(skycube)[1], np.shape(skycube)[2]))
+            skycube[skycube_clipped.mask] = median_cube[skycube_clipped.mask]
+            skycube[:, ~use] = skycube0[:, ~use]
+            cleancube = zobj.cube - skycube
 
-        # save the output cube
-        self.cleanhdu = self.scihdu.copy()
-        self.cleanhdu.append(self.scihdu[0])
-        self.cleanhdu[-1].name = 'UNZAPPED'
-        self.cleanhdu[0].data = cleancube
-        # bad = np.where(self.cleanhdu['FLAGS'].data >=8)
-        # self.cleanhdu[0].data[bad] = 0
-        skyhdu = fits.ImageHDU(data=skycube, header=self.scihdu[0].header)
-        skyhdu.name = 'SKYMODEL_ZAP'
-        self.cleanhdu.append(skyhdu)
+            # save the output cube
+            self.cleanhdu = self.scihdu.copy()
+            self.cleanhdu.append(self.scihdu[0])
+            self.cleanhdu[-1].name = 'UNZAPPED'
+            self.cleanhdu[0].data = cleancube
+            # bad = np.where(self.cleanhdu['FLAGS'].data >=8)
+            # self.cleanhdu[0].data[bad] = 0
+            skyhdu = fits.ImageHDU(data=skycube, header=self.scihdu[0].header)
+            skyhdu.name = 'SKYMODEL_ZAP'
+            self.cleanhdu.append(skyhdu)
+        else:
+            self.cleanhdu = self.scihdu.copy()
+
         check_dir(self.output)
         self.cleanhdu.writeto(f'{self.output}/{self.prefix}_{self.index:05d}_zap_{self.ctype}.fits', overwrite = True)
 
@@ -1221,10 +1270,18 @@ class KCWIViewerApp:
                                     image_size[2]+2*padding_x), dtype=np.uint8)
             output_flags = np.zeros((image_size[0], image_size[1] + 2*padding_y,
                                     image_size[2] + 2 * padding_x), dtype=np.uint8)
-            output_skymodel_zap = np.zeros((image_size[0], image_size[1]+2*padding_y,
-                                    image_size[2]+2*padding_x), dtype=np.float64)
-            output_unzapped = np.zeros((image_size[0], image_size[1]+2*padding_y,
-                                    image_size[2]+2*padding_x), dtype=np.float64)
+
+            if 'SKYMODEL_ZAP' in [hdu.name for hdu in self.cleanhdu]:
+                output_skymodel_zap = np.zeros((image_size[0], image_size[1]+2*padding_y,
+                                        image_size[2]+2*padding_x), dtype=np.float64)
+            else:
+                output_skymodel_zap = None
+            
+            if 'UNZAPPED' in [hdu.name for hdu in self.cleanhdu]:
+                output_unzapped = np.zeros((image_size[0], image_size[1]+2*padding_y,
+                                        image_size[2]+2*padding_x), dtype=np.float64)
+            else:
+                output_unzapped = None
             
             if 'NOSKYSUB' in [hdu.name for hdu in self.cleanhdu]:
                 output_noskysub = np.zeros((image_size[0],
@@ -1249,11 +1306,13 @@ class KCWIViewerApp:
             output_flags[:, padding_y:(padding_y+image_size[1]),
                         padding_x:(padding_x+image_size[2])] = self.cleanhdu['FLAGS'].data
             
-            output_unzapped[:, padding_y:(padding_y+image_size[1]),
-                        padding_x:(padding_x+image_size[2])] = self.cleanhdu['UNZAPPED'].data
+            if output_unzapped is not None:
+                output_unzapped[:, padding_y:(padding_y+image_size[1]),
+                            padding_x:(padding_x+image_size[2])] = self.cleanhdu['UNZAPPED'].data
             
-            output_skymodel_zap[:, padding_y:(padding_y+image_size[1]),
-                        padding_x:(padding_x+image_size[2])] = self.cleanhdu['SKYMODEL_ZAP'].data
+            if output_skymodel_zap is not None:
+                output_skymodel_zap[:, padding_y:(padding_y+image_size[1]),
+                            padding_x:(padding_x+image_size[2])] = self.cleanhdu['SKYMODEL_ZAP'].data
             
             if output_noskysub is not None:
                 output_noskysub[:, padding_y:(padding_y + image_size[1]),
@@ -1278,10 +1337,12 @@ class KCWIViewerApp:
                                                                 x_shift), order=1, mode = 'constant', cval=128))
                 output_flags[j, :, :] = np.ceil(shift(output_flags[j, :, :], (y_shift,
                                                                   x_shift), order=1, mode = 'constant', cval=128))
-                output_unzapped[j, :, :] = shift(output_unzapped[j, :, :],
-                                            (y_shift, x_shift), order = DAR_shift_order)
-                output_skymodel_zap[j, :, :] = shift(output_skymodel_zap[j, :, :],
-                                            (y_shift, x_shift), order = DAR_shift_order)
+                if output_unzapped is not None:
+                    output_unzapped[j, :, :] = shift(output_unzapped[j, :, :],
+                                                (y_shift, x_shift), order = DAR_shift_order)
+                if output_skymodel_zap is not None:
+                    output_skymodel_zap[j, :, :] = shift(output_skymodel_zap[j, :, :],
+                                                (y_shift, x_shift), order = DAR_shift_order)
                 if output_noskysub is not None:
                     output_noskysub[j, :, :] = shift(output_noskysub[j, :, :],
                                                     (y_shift, x_shift), order = DAR_shift_order)
@@ -1291,9 +1352,10 @@ class KCWIViewerApp:
             self.cleanhdu['UNCERT'].data = output_stddev
             self.cleanhdu['MASK'].data = output_mask
             self.cleanhdu['FLAGS'].data = output_flags
-            self.cleanhdu['UNZAPPED'].data = output_unzapped
-            self.cleanhdu['SKYMODEL_ZAP'].data = output_skymodel_zap
-
+            if output_unzapped is not None:
+                self.cleanhdu['UNZAPPED'].data = output_unzapped
+            if output_skymodel_zap is not None:
+                self.cleanhdu['SKYMODEL_ZAP'].data = output_skymodel_zap
             if output_noskysub is not None:
                 self.cleanhdu['NOSKYSUB'].data = output_noskysub
 
@@ -1337,12 +1399,22 @@ class KCWIViewerApp:
             #flux calibration and telluric correction
             if self.ctype == 'icubes':
                 self.insert_text(f'[INFO] The input datacube has been flux calibrated! Skip the flux calibration. Running telluric correction...')
-                mscal = 1. / tellmodel
+                if self.use_telluric.get():
+                    mscal = 1. / tellmodel
+                else:
+                    mscal = np.ones_like(tellmodel)
             else:
                 self.insert_text(f'[INFO] Running the flux calibration and telluric correction...') 
-                mscal = self.std['invsens_model'] * 1e16 / self.cleanhdu[0].header['XPOSURE'] #normalize by the exposure time
-                mscal, self.cleanhdu[0].header = kcwi_correct_extin(mscal, self.cleanhdu[0].header)
-                mscal = mscal[use] / tellmodel #include the telluric correction
+                if self.use_invsens.get():
+                    mscal = self.std['invsens_model'] * 1e16 / self.cleanhdu[0].header['XPOSURE'] #normalize by the exposure time
+                    mscal, self.cleanhdu[0].header = kcwi_correct_extin(mscal, self.cleanhdu[0].header)
+                else:
+                    mscal = np.ones_like(self.std['invsens_model'])
+
+                if self.use_telluric.get():
+                    mscal = mscal[use] / tellmodel #include the telluric correction
+                else:
+                    mscal = mscal[use]
 
             #reshpae the 1D mscal to 3D 
             mscal = mscal[:, np.newaxis, np.newaxis]
@@ -1351,15 +1423,24 @@ class KCWIViewerApp:
             self.cleanhdu_flux = self.cleanhdu.copy() #flux-calibrated cube
             self.cleanhdu_flux[0].data *= mscal
             self.cleanhdu_flux['UNCERT'].data *= mscal
-            self.cleanhdu_flux['UNZAPPED'].data *= mscal
-            self.cleanhdu_flux['SKYMODEL_ZAP'].data *= mscal
             self.cleanhdu_flux[0].header['BUNIT'] = '1e-16 erg / (Angstrom cm2 s)'
             self.cleanhdu_flux[0].header['STDCOR'] = (True, 'std corrected?')
             self.cleanhdu_flux[0].header['MSFILE'] = ('{}_invsens_updated.fits'.format(self.std['frame']), 'Master std filename')
+            
             try:
                 # This header may not be necessary? -YC
                 self.cleanhdu_flux[0].header['MSIMNO'] = (int(self.std['frame'][-5:]), 'master std image number')
             except:
+                pass
+
+            try:
+                self.cleanhdu_flux['UNZAPPED'].data *= mscal
+            except KeyError:
+                pass
+
+            try:
+                self.cleanhdu_flux['SKYMODEL_ZAP'].data *= mscal
+            except KeyError:
                 pass
 
             try:
@@ -1394,11 +1475,18 @@ class KCWIViewerApp:
 
 
         #plot the spectrum
-        self.plot_spec_dict = {'datacube': self.cleanhdu_flux[0].data, 'errcube': self.cleanhdu_flux['UNCERT'].data,
-                                'flagcube': self.cleanhdu_flux['FLAGS'].data, 
-                                'z': self.redshift, 'yunit': self.cleanhdu_flux[0].header['BUNIT'], 
-                                'skycube': self.cleanhdu_flux['UNZAPPED'].data, 'unzapped_skycube': True,
-                                'restore_limit': False, 'show_lines': True}
+        if 'UNZAPPED' in [hdu.name for hdu in self.cleanhdu]:
+            self.plot_spec_dict = {'datacube': self.cleanhdu_flux[0].data, 'errcube': self.cleanhdu_flux['UNCERT'].data,
+                                    'flagcube': self.cleanhdu_flux['FLAGS'].data, 
+                                    'z': self.redshift, 'yunit': self.cleanhdu_flux[0].header['BUNIT'], 
+                                    'skycube': self.cleanhdu_flux['UNZAPPED'].data, 'unzapped_skycube': True,
+                                    'restore_limit': False, 'show_lines': True}
+        else:
+            self.plot_spec_dict = {'datacube': self.cleanhdu_flux[0].data, 'errcube': self.cleanhdu_flux['UNCERT'].data,
+                                    'flagcube': self.cleanhdu_flux['FLAGS'].data, 
+                                    'z': self.redshift, 'yunit': self.cleanhdu_flux[0].header['BUNIT'], 
+                                    'skycube': None, 'unzapped_skycube': False,
+                                    'restore_limit': False, 'show_lines': True}
 
         self.insert_text(f'[INFO] ZAP Done for {self.prefix}_{self.index:05d}!')
         self.plot_spectrum(**self.plot_spec_dict)
@@ -1455,6 +1543,9 @@ class KCWIViewerApp:
                 self.std['invsens_model'] = None
                 self.std['tellmodel'] = None
                 self.std['statenam'] = hdr['statenam']
+                xknots, yknots = self.gen_knots(self.std['wave'], self.std['invsens_data'], self.std['flag'])
+                self.std['xknots'] = xknots
+                self.std['yknots'] = yknots
 
             #the updated version, so no need to crop the data
             elif type == 'updated':
@@ -1473,11 +1564,20 @@ class KCWIViewerApp:
                 self.std['frame'] = re.sub('_invsens_updated.fits', '', os.path.basename(self.std_entry.get()))
                 self.std['statenam'] = hdr['statenam']
 
+                # knots
+                if len(hdu) > 1:
+                    self.std['xknots'] = hdu[1].data[0]
+                    self.std['yknots'] = hdu[1].data[1]
+                else:
+                    xknots, yknots = self.gen_knots(self.std['wave'], self.std['invsens_data'], self.std['flag'])
+                    self.std['xknots'] = xknots
+                    self.std['yknots'] = yknots
+
 
 
             #setup the B-Spline fit parameters
-            self.std['bspline_bkpt'] = 150 #breakpoints
-            self.std['bspline_polyorder'] = 3 #polynomial order between interval
+            #self.std['bspline_bkpt'] = 100 #breakpoints
+            #self.std['bspline_polyorder'] = 3 #polynomial order between interval
             
             self.insert_text(f"[INFO] Loading the {self.std_entry.get()}")
 
@@ -1506,8 +1606,8 @@ class KCWIViewerApp:
             inst = ("[INSTRUCTIONS] \n"
                     "'i' - include fitting regions;\n"
                     "'e' - exclude fitting regions;\n"
-                    "'a' - add a single data point for fitting;\n"
-                    "'d' - delete a single data point;\n"
+                    "'a' - add knots for fitting;\n"
+                    "'d' - delete knots;\n"
                     "'f' - refit the sensitivity curve with spline;\n"
                     "'b' - reverse the DRP sensitivity curve;\n"
                     "'t' - fit the telluric model [this may take a while].")
@@ -1532,6 +1632,12 @@ class KCWIViewerApp:
             newdata = np.vstack((newdata, self.std['tellmodel']))
 
         newhdu = fits.PrimaryHDU(newdata, header = newhdr)
+
+        # knots
+        if self.std['xknots'] is not None:
+            knots = np.vstack((self.std['xknots'], self.std['yknots']))
+            khdu = fits.ImageHDU(knots)
+            newhdu = fits.HDUList([newhdu, khdu])
 
         frame = self.std['frame']
         filename = f'{self.output}/{frame}_invsens_updated.fits'
@@ -1561,33 +1667,42 @@ class KCWIViewerApp:
         if self.std['name'] != 'combined':
             self.ax.plot(self.std['spec_calib'][:,0], self.std['spec_calib'][:,1], color = 'k', label = 'Standard star template')
 
-
-        use_region = np.where(self.std['flag'] == 1)[0]
-        use_point = np.where(self.std['flag'] == 2)[0]
+        invsens_region = np.where(self.std['flag'] == 1)[0]
+        telluric_region = np.where(self.std['flag'] == 2)[0]
 
         #plot the updated flux-calibrated model
         if self.std['invsens_model'] is not None:
             self.ax.step(self.std['wave'], self.std['counts'] * self.std['invsens_model'], color = 'cyan', 
                          lw =1, label = 'Flux calibrated spec (refit) ', where = 'mid') #raw count x invsens = flux-calibrated spec
-            self.ax.plot(self.std['wave'][use_region], (self.std['counts'] * self.std['invsens_model'])[use_region], 'x', 
-                        color = 'lightgreen', ms = 5, label = 'Selected for fitting') #selected regions 
-            if len(use_point) > 0:
-                self.ax.plot(self.std['wave'][use_point], (self.std['counts'] * self.std['invsens_model'])[use_point], 'o', 
-                            color = 'darkgreen', ms = 10, label = 'Selected for fitting') #selected pixels 
+            self.ax.plot(self.std['wave'][invsens_region], (self.std['counts'] * self.std['invsens_model'])[invsens_region], 'x', 
+                        color = 'lightgreen', ms = 5, label = 'Selected for invsens fitting') #selected regions 
+            self.ax.plot(self.std['wave'][telluric_region], (self.std['counts'] * self.std['invsens_model'])[telluric_region], 'x', 
+                        color = 'darkgreen', ms = 5, label = 'Selected for telluric fitting') #selected pixels 
 
              #plot the telluric-corrected model
             if self.std['tellmodel'] is not None:
                 telluric = self.std['tellmodel']**(self.std['invsens_hdr']['AIRMASS']) #convert the model at AM=1.0 to the real AM
                 self.ax.step(self.std['wave'], self.std['counts'] * self.std['invsens_model'] / telluric, color = 'royalblue',
                             where = 'mid', lw = 1, label = 'Telluric corrected, flux calibrated spec')
+                
+            if self.std['xknots'] is not None:
+                li = interp1d(self.std['wave'], self.std['counts'], kind = 'linear', bounds_error=False, fill_value = 0)
+                counts_knots = li(self.std['xknots'])
+                self.ax.scatter(self.std['xknots'], (self.std['yknots'] * counts_knots), marker='o', 
+                    color = 'cyan', s = 100, label = 'Knots for invsens fitting', edgecolors='k')
         
         #plot the DRP-reduced flux-calibrated model
         else:
-            self.ax.plot(self.std['wave'][use_region], (self.std['counts'] * self.std['invsens_model_drp'])[use_region], 'x', 
-                    color = 'lightgreen', ms = 5, label = 'Selected for fitting') #selected regions 
-            if len(use_point) > 0:
-                self.ax.plot(self.std['wave'][use_point], (self.std['counts'] * self.std['invsens_model_drp'])[use_point], 'o', 
-                            color = 'darkgreen', ms = 10, label = 'Selected for fitting') #selected pixels 
+            self.ax.plot(self.std['wave'][invsens_region], (self.std['counts'] * self.std['invsens_model_drp'])[invsens_region], 'x', 
+                    color = 'lightgreen', ms = 5, label = 'Selected for invsens fitting') #selected regions 
+            self.ax.plot(self.std['wave'][telluric_region], (self.std['counts'] * self.std['invsens_model_drp'])[telluric_region], 'x', 
+                        color = 'darkgreen', ms = 5, label = 'Selected for telluric fitting') #selected pixels 
+            
+            if self.std['xknots'] is not None:
+                li = interp1d(self.std['wave'], self.std['counts'], kind = 'linear', bounds_error=False, fill_value = 0)
+                counts_knots = li(self.std['xknots'])
+                self.ax.scatter(self.std['xknots'], (self.std['yknots'] * counts_knots), marker='o', 
+                    color = 'cyan', s = 100, label = 'Knots for invsens fitting', edgecolors='k')
 
 
         self.ax.set_title('{0} - {1} - {2}'.format(self.std['frame'], self.std['name'], self.std['statenam']))
@@ -1607,7 +1722,10 @@ class KCWIViewerApp:
 
     def mask_skyline_region(self, wave, flag):
         """
-        Mask out the region with dense sky line and telluric absorption from flux calibration fitting
+        Mask out the region with dense sky line for invsens fitting. Telluric masks are subsequently applied by hand.
+        0 - masked
+        1 - good for invsens
+        2 - good for telluric
         """
         regions = [[6274, 6302],[6864.00, 6950.00], [7160.00, 7385.00], [7590, 7691],[8102, 8375],
                    [8943, 9225], [9300, 9400],
@@ -1617,8 +1735,7 @@ class KCWIViewerApp:
         mask = False
         for r in regions:
             mask |= (wave >= r[0]) & (wave <= r[1])
-
-        flag[mask] = 0
+        flag[mask & (flag != 0)] = 2
 
         return flag
         # [6864, 6935], [7164, 7345], [7591, 7694], [8131]]
@@ -1652,7 +1769,8 @@ class KCWIViewerApp:
         col3 = fits.Column(name = 'ivar', format = '1D', array = std_ivar)
 
         #mask used for telluric correction, bad pixels with mask = 0
-        mask = np.full(len(std_flux), 1, dtype = int)
+        #mask = np.full(len(std_flux), 1, dtype = int)
+        mask = (self.std['flag'] == 1) | (self.std['flag'] == 2)
         #the std spec in both DRP and pypeit seems to have some problems here; mask it out for g19b2b, should check for other stds
         # mask[(self.std['wave'] >=6310) & self.std['wave'] <= 6380] = 0 
         col4 = fits.Column(name = 'mask', format = '1K', array = mask)
@@ -1664,7 +1782,7 @@ class KCWIViewerApp:
         #need to update the header for pypeit input
         keys_1 = { 'DMODCLS': 'OneSpec ', 'DMODVER': '1.0.2   ', 'FLUXED': True, 
         'CHECKSUM': 'CG5BCD59CD5ACD59', 'DATASUM': '60558086'
-       }
+        }
         keys_2 = {'PYP_SPEC': 'keck_kcrm', 'PYPELINE': 'SlicerIFU',  'TARGET':newhdr['OBJECT'],
         'DISPNAME': self.std['invsens_hdr']['RGRATNAM'], 'decker': self.std['invsens_hdr']['IFUNAM'],  
         'binning': self.std['invsens_hdr']['BINNING'], 'FILENAME': '%s.fits'%frame,
@@ -1760,6 +1878,12 @@ class KCWIViewerApp:
                 #flag the region to False to be included in the fitting
                 else:
                     self.std['flag'][(self.std['wave']>= self.std['region_start']) & (self.std['wave']<= self.std['region_end'])] = 1
+                self.std['flag'] = self.mask_skyline_region(self.std['wave'], self.std['flag'])
+
+                # regenerate knots
+                xknots, yknots = self.gen_knots(self.std['wave'], self.std['invsens_data'], self.std['flag'])
+                self.std['xknots'] = xknots
+                self.std['yknots'] = yknots
                     
                 self.std['region_start'] = None #reset the starting point for the next input
                 self.plot_std(restore_limit = True) #update the std plot
@@ -1769,26 +1893,32 @@ class KCWIViewerApp:
             #find the index of the point closest to the mouse location
             # idx = np.argmin((self.std['wave'] - event.xdata)**2 + (self.std['counts'] * self.std['invsens_model_drp'] - event.ydata)**2) 
             idx = np.argmin(np.abs(self.std['wave'] - event.xdata))
-            self.std['flag'][idx] = 2
+            self.std['xknots'] = np.append(self.std['xknots'], self.std['wave'][idx])
+            self.std['yknots'] = np.append(self.std['yknots'], (self.std['invsens_data'])[idx])
+
+            #sort the knots
+            index_sort = np.argsort(self.std['xknots'])
+            self.std['xknots'] = self.std['xknots'][index_sort]
+            self.std['yknots'] = self.std['yknots'][index_sort]
+
             # print(self.std['use_ind'])
             self.plot_std(restore_limit = True)
         
         # delete single one continuum data point closest to the mouse location; should be used in the regions with dense sky features
         if event.key == 'd':
-            if np.sum(self.std['flag'] ==2) > 0:
-                # idx = np.argmin((self.std['wave'][self.std['use_ind']] - event.xdata)**2 + ((self.std['counts'] * self.std['invsens_model_drp'])[self.std['use_ind']] - event.ydata)**2) 
-                ind_point = np.where(self.std['flag'] ==2 )[0]
-                idx = np.argmin(np.abs(self.std['wave'][ind_point] - event.xdata))
-                self.std['flag'][ind_point[idx]] = 0
-                # self.std['use_ind'] = np.delete(self.std['use_ind'], idx)
-                self.plot_std(restore_limit = True)
+            # idx = np.argmin((self.std['wave'][self.std['use_ind']] - event.xdata)**2 + ((self.std['counts'] * self.std['invsens_model_drp'])[self.std['use_ind']] - event.ydata)**2) 
+            idx = np.argmin(np.abs(self.std['xknots'] - event.xdata))
+            self.std['xknots'] = np.delete(self.std['xknots'], idx)
+            self.std['yknots'] = np.delete(self.std['yknots'], idx)
+            # self.std['use_ind'] = np.delete(self.std['use_ind'], idx)
+            self.plot_std(restore_limit = True)
 
         #running the invsens fitting
         if event.key == 'f':
-            use = self.std['flag'] > 0
             # use[self.std['use_ind']] = True
             # print(len(use), self.std['wave'])
-            self.std['invsens_model'] = self.fit_bspline(self.std['wave'], self.std['invsens_data'], self.std['bspline_bkpt'], self.std['bspline_polyorder'], use)
+            self.std['invsens_model'] = self.fit_pchip(self.std['xknots'], self.std['yknots'], self.std['wave'])
+            #self.std['invsens_model'] = self.fit_bspline(self.std['wave'], self.std['invsens_data'], self.std['bspline_bkpt'], self.std['bspline_polyorder'], use)
             
             self.plot_std(restore_limit = True)
 
@@ -1861,6 +1991,43 @@ class KCWIViewerApp:
         bspline = splrep(x, y, k = k, task=-1, t=x[knots_idx])
 
         return splev(x_full, bspline)
+    
+    def gen_knots(self, x_full, y_full, flag, bkpt=100):
+        knots_idx = np.arange(0, x_full.size, bkpt)
+        use = (flag == 1)
+
+        xknots = x_full[knots_idx]
+        dx = xknots[1] - xknots[0]
+        yknots = np.zeros(xknots.size)
+        for i, xknot in enumerate(xknots):
+            index = (x_full >= xknot-dx/2) & (x_full < xknot+dx/2)
+            dps = y_full[index]
+            ups = use[index]
+            if np.sum(ups) > len(ups)/4:
+                yknots[i] = np.median(dps[ups])
+            else:
+                yknots[i] = np.nan
+        index = ~np.isnan(yknots)
+        xknots = xknots[index]
+        yknots = yknots[index]
+
+        return xknots, yknots
+    
+    def fit_pchip(self, xknots, yknots, x_full):
+        """
+        A simple PCHIP-fit wrapper for flux calibration
+
+        Args:
+            x (1D arr): x data
+            y (1D arr): y data
+            use (boolen arry, same shape as x and y): True for pixels used for fitting
+        """
+
+        index_sort = np.argsort(xknots)
+        pi = PchipInterpolator(xknots[index_sort], yknots[index_sort], extrapolate=True)
+        invsens_model = pi(x_full)
+
+        return invsens_model
 
 
     # def set_zap_skyseg(self):
