@@ -54,7 +54,7 @@ for KCWI/KCRM data. Users must first reduce the data using the [KCWI Data Reduct
 
    ```bash
    cd /path/to/KSkyWizard
-   python setup.py develop
+   pip install .
    ```
 
 ## Download the Mauna Kea telluric data
@@ -67,7 +67,7 @@ To perform telluric correction, PypeIt uses preconstructed PCA models. Follow th
    pypeit_install_telluric TelFit_MaunaKea_3100_26100_R20000.fits
    ```
 
-2. **Locate the telluric data.**
+2. **Configure the telluric data location.**
 
    - The telluric data is typically stored in:
    
@@ -76,10 +76,16 @@ To perform telluric correction, PypeIt uses preconstructed PCA models. Follow th
    - Each subdirectory contains:
       - A `contents` file (the actual data file)
       - A `url` file (an ASCII file linking to the download URL)
+      - Take a note of the full path of the `contents` file, e.g., `~/.pypeit/cache/download/url/5f17ecc1fcc921d6ec01e18d931ec2f8/contents`
 
-   - Find the path to the `contents` file, and set it as the `telgridfile` variable in `setup.cfg`, located at:
+   - Locate the installed version of the `processing.cfg` file. Note that this is typically different from where you 
+   stored cloned version of this repository. 
+      
+      ```bash
+      kskywizard --config_path
+      ```
 
-      `/path/to/KSkyWizard/setup.cfg`
+   This will return the full path of the `procecssing.cfg` file. Modify the `telgridfile` variable in the file, and point it to the content path from above.
    
    Example:
 
