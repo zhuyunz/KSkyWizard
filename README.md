@@ -85,13 +85,13 @@ To perform telluric correction, PypeIt uses preconstructed PCA models. Follow th
       kskywizard --config_path
       ```
 
-   This will return the full path of the `procecssing.cfg` file. Modify the `telgridfile` variable in the file, and point it to the content path from above.
-   
-   Example:
+      This will return the full path of the `procecssing.cfg` file. Modify the `telgridfile` variable in the file, and point it to the content path from above.
+      
+      Example:
 
-   ```plaintext
-   telgridfile = ~/.pypeit/cache/download/url/5f17ecc1fcc921d6ec01e18d931ec2f8/contents
-   ```
+      ```plaintext
+      telgridfile = ~/.pypeit/cache/download/url/5f17ecc1fcc921d6ec01e18d931ec2f8/contents
+      ```
 
    **Important**: **DO NOT** include quotation marks around the file path.
 
