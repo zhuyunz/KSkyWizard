@@ -41,6 +41,9 @@ py/__pycache__
 __pycache__/
 *.py[cod]
 
+# local build files
+build
+
 
 # Jupyter Notebook
 .ipynb_checkpoints
