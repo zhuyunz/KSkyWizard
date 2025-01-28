@@ -33,7 +33,7 @@ setuptools.setup(name=NAME,
     author=AUTHOR,
     author_email=AUTHOR_EMAIL,
     packages=setuptools.find_packages(),
-    package_data={'': ['data/extin/*', 'data/stds/*', 'processing.cfg']},
+    package_data={'': ['data/extin/*', 'data/stds/*', 'data/lines.dat', 'processing.cfg']},
     entry_points=entry_points,
     install_requires=[
         'astropy',
