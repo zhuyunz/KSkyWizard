@@ -172,6 +172,21 @@ class KCWIViewerApp:
         # self.std_bspline_entry.grid(row = 4, column = 5)
         # self.std_bspline_entry.bind("<Return>", self.update_bspline_pars)
 
+        ############## Load the standard star spectrum and manually set the wavelength range ############
+        self.std_wvl_label = tk.Label(self.tab1, text="invsens good wavelength range: ", anchor='e')
+        self.std_wvl_label.grid(row = 2, column = 0, sticky='ew')
+        self.std_wvl_upper_entry = tk.Entry(self.tab1)
+        self.std_wvl_upper_entry.grid(row = 2, column = 2, sticky='ew')
+        self.std_wvl_lower_entry = tk.Entry(self.tab1)
+        self.std_wvl_lower_entry.grid(row = 2, column = 1, sticky='ew')
+        self.std_wvl_update_button = tk.Button(self.tab1, text = 'set', command = self.update_wvl_range)
+        self.std_wvl_update_button.grid(row = 2, column = 3, sticky='ew')
+
+        self.std_wvl_range = [-1, -1] #default range for the invsens
+        self.std_wvl_lower_entry.insert(tk.END,  self.std_wvl_range[0])
+        self.std_wvl_upper_entry.insert(tk.END,  self.std_wvl_range[1])
+
+
         self.tab1.columnconfigure(0, weight=1)
         self.tab1.columnconfigure(1, weight=1)
         self.tab1.columnconfigure(2, weight=1)
@@ -221,6 +236,9 @@ class KCWIViewerApp:
         self.load_button = tk.Button(self.tab2, text="Save Cropped Cube", command=self.save_cropped_data)
         self.load_button.grid(row=3, column=2, sticky='ew')
 
+        ############# data cropping parameters ############
+        self.data_wvl_range= [-1, -1] #default range for the science data, wavgood range
+        
         ############# Load cropped data button############
         self.load_crop_button = tk.Button(self.tab2, text="Load Cropped Cube", command=lambda: self.load_data('cropped'))
         self.load_crop_button.grid(row=3, column=3, sticky='ew')
@@ -278,6 +296,12 @@ class KCWIViewerApp:
                                                   onvalue = True, offvalue = False, anchor='w')
         self.use_zap_checkbox.grid(row = 5, column = 2, sticky='ew')
         self.use_zap.set(True)
+
+        self.stacked = tk.BooleanVar()
+        self.stacked_checkbox = tk.Checkbutton(self.tab2, text='stacked data?', variable=self.stacked,
+                                                  onvalue = True, offvalue = False, anchor='w')
+        self.stacked_checkbox.grid(row = 5, column = 3, sticky='ew')
+        self.stacked.set(False)
 
         self.tab2.columnconfigure(0, weight=1)
         self.tab2.columnconfigure(1, weight=1)
@@ -409,7 +433,7 @@ class KCWIViewerApp:
         else:
             self.index2_entry.delete(0, tk.END)
 
-    def get_file_prefix_index(self, input, sci_index = True):
+    def get_file_prefix_index(self, input, sci_index = True, stacked = False):
         # extract the prefix and index from the input string
 
         # if input is a number
@@ -439,7 +463,10 @@ class KCWIViewerApp:
         else:
             # input is a string of basename or full filename
             try:
-                if sci_index:
+                if stacked:
+                    self.prefix = os.path.basename(input).split('-',1)[0]
+                    self.index = os.path.basename(input).split('-',1)[1]
+                elif sci_index:
                     self.prefix = os.path.basename(input)[:8]
                     self.index = int(os.path.basename(input)[9:14])
                 else:
@@ -472,7 +499,12 @@ class KCWIViewerApp:
 
     def update_index_entries(self):
         #if update the science frame number
-        if self.last_focused_entry == self.index_entry and self.index > 0:
+        if self.last_focused_entry == self.index_entry and self.stacked.get():
+            self.index_entry.delete(0, tk.END)
+            self.index_entry.insert(tk.END, f'{self.prefix}-{self.index}')
+            self.insert_text(f"[INFO] Set the science frame: {self.prefix}-{self.index}")
+            # self.index_entry.selection_clear()
+        elif self.last_focused_entry == self.index_entry and self.index > 0:
             self.index_entry.delete(0, tk.END)
             self.index_entry.insert(tk.END, f'{self.prefix}_{self.index:05d}')
             self.insert_text(f"[INFO] Set the science frame: {self.prefix}_{self.index:05d}")
@@ -497,6 +529,18 @@ class KCWIViewerApp:
             self.redshift_entry.insert(tk.END, str(self.redshift))
             self.insert_text(f"[INFO] Set the redshift to z = {self.redshift:0.3f} ")
 
+        """
+        #update the wavelength range
+        if (self.last_focused_entry == self.std_wvl_upper_entry) or (self.last_focused_entry == self.std_wvl_lower_entry):
+            self.std_wvl_upper_entry.delete(0, tk.END)
+            self.std_wvl_upper_entry.insert(tk.END, str(self.std_wvl_range[1]))
+            self.std_wvl_lower_entry.delete(0, tk.END)
+            self.std_wvl_lower_entry.insert(tk.END, str(self.std_wvl_range[0]))
+            toprint = ["WAVEGOOD" if std_wvl < 0 else std_wvl for std_wvl in self.std_wvl_range]
+            
+            self.insert_text(f"[INFO] Set the wavelength range for the invsens curve to {toprint[0]} - {toprint[1]}")
+        """
+
         #update the region box
         if self.last_focused_entry == self.region_box_entry:
             self.region_box_entry.delete(0, tk.END)
@@ -511,7 +555,7 @@ class KCWIViewerApp:
 
     def update_index(self, event):
         try:
-            self.get_file_prefix_index(self.index_entry.get())
+            self.get_file_prefix_index(self.index_entry.get(),stacked=self.stacked.get())
 
             #drop the attribute "zap" to reinitialize the ZAP configuration
             self.zap = {}
@@ -530,6 +574,19 @@ class KCWIViewerApp:
         except ValueError:
             pass #no sky frame
         self.update_index_entries()
+
+    def update_wvl_range(self):
+        """
+        Update the wavelength range for the invsens curve
+        """
+        try:
+            #get the wavelength range
+            self.std_wvl_range = [float(self.std_wvl_lower_entry.get()), float(self.std_wvl_upper_entry.get())]
+        except ValueError:
+            self.std_wvl_range = [-1, -1]
+        toprint = ["WAVEGOOD" if std_wvl < 0 else std_wvl for std_wvl in self.std_wvl_range]
+        self.insert_text(f"[INFO] Setting the wavelength range for the invsens curve to {toprint[0]} - {toprint[1]}")
+
 
     def update_mindex(self, event):
         """
@@ -685,7 +742,22 @@ class KCWIViewerApp:
             self.insert_text(f'[ERROR] datatype not recognized! Need to be "raw" or "cropped" ')
 
         # load the science frame
-        if self.index > 0:
+        if self.stacked.get():
+            # self.scipath = f'{base}/{self.prefix}_{self.index:05d}_{self.ctype}.fits'
+            self.scihdu = fits.open(f'{base}/{self.prefix}-{self.index}_{self.ctype}.fits')
+            self.objname = self.scihdu[0].header['OBJECT']
+            self.scihdu = fits.open(f'{base}/{self.prefix}-{self.index}_{self.ctype}.fits')
+            self.scihdr = self.scihdu[0].header
+            self.obswave = (np.arange(self.scihdr['NAXIS3']) + 1 - self.scihdr['CRPIX3']) * self.scihdr['CD3_3'] + self.scihdr['CRVAL3']
+            if self.obswave[-1] > wlimg_wave_range_red[0]:
+                self.wlimg_wave_range = wlimg_wave_range_red
+            else:
+                self.wlimg_wave_range = wlimg_wave_range_blue
+            # in case we are using RM or RH:
+            windex = (self.obswave > self.wlimg_wave_range[0]) & (self.obswave < self.wlimg_wave_range[1])
+            if np.sum(windex) ==0:
+                self.wlimg_wave_range = [self.scihdr['WAVGOOD0'], self.scihdr['WAVGOOD1']]
+        elif self.index > 0:
             # self.scipath = 
             self.scihdu = fits.open(f'{base}/{self.prefix}_{self.index:05d}_{self.ctype}.fits')
             self.objname = self.scihdu[0].header['OBJECT']
@@ -716,9 +788,13 @@ class KCWIViewerApp:
             self.insert_text(f"[ERROR] Wrong science frame! Need to set it to a positive integer. Check the KCWI log for the frame number!")
 
         #replace the edge pixels with NaNs
-        badpix = np.where(np.mean(self.scihdu['FLAGS'].data, axis = 0) > 100)
-        self.scihdu[0].data[:, badpix[0], badpix[1]] = np.nan
-        self.scihdu['UNCERT'].data[:, badpix[0], badpix[1]] = np.nan
+        if self.stacked.get():
+            badpix = np.where(np.mean(self.scihdu[0].data,axis=0) < 1e-6)
+            self.scihdu[0].data[:, badpix[0], badpix[1]] = np.nan
+        else:
+            badpix = np.where(np.mean(self.scihdu['FLAGS'].data, axis = 0) > 100)
+            self.scihdu[0].data[:, badpix[0], badpix[1]] = np.nan
+            self.scihdu['UNCERT'].data[:, badpix[0], badpix[1]] = np.nan
 
         # self.z = 0
         if self.index2 > 0:
@@ -739,11 +815,15 @@ class KCWIViewerApp:
             # self.skyhdu['FLAGS'].data[badpix] = np.nan
             badpix = np.where(np.mean(self.skyhdu['FLAGS'].data, axis = 0) > 100)
             self.skyhdu[0].data[:, badpix[0], badpix[1]] = np.nan
-
-            self.plot_spec_dict = {'datacube': self.scihdu[0].data, 'errcube': self.scihdu['UNCERT'].data,
-                                    'flagcube': self.scihdu['FLAGS'].data, 
+            if self.stacked.get():
+                self.plot_spec_dict = {'datacube': self.scihdu[0].data, 
                                     'z': 0.0,
                                    'yunit': self.scihdr['BUNIT'], 'skycube': self.skyhdu[0].data}
+            else:
+                self.plot_spec_dict = {'datacube': self.scihdu[0].data, 'errcube': self.scihdu['UNCERT'].data,
+                                        'flagcube': self.scihdu['FLAGS'].data, 
+                                        'z': 0.0,
+                                    'yunit': self.scihdr['BUNIT'], 'skycube': self.skyhdu[0].data}
             
 
             #replace the bad pixels (flags >0) with NaNs
@@ -754,14 +834,22 @@ class KCWIViewerApp:
         else:
             self.skyhdu = None
             # self.plot_spectrum(self.scihdu[0].data, yunit = self.scihdr['BUNIT']) #plot the spectrum of the central region (x = [12, 22], y = [43, 53]; 10x10 box) for a quick look. 
-            self.plot_spec_dict = {'datacube': self.scihdu[0].data, 'errcube': self.scihdu['UNCERT'].data, 
-                                    'flagcube': self.scihdu['FLAGS'].data, 'z': 0.0,
-                                   'yunit': self.scihdr['BUNIT'], 'skycube': None} 
+            if self.stacked.get():
+                self.plot_spec_dict = {'datacube': self.scihdu[0].data, 
+                                    'z': 0.0,
+                                   'yunit': self.scihdr['BUNIT'], 'skycube': None}
+            else:
+                self.plot_spec_dict = {'datacube': self.scihdu[0].data, 'errcube': self.scihdu['UNCERT'].data, 
+                                        'flagcube': self.scihdu['FLAGS'].data, 'z': 0.0,
+                                    'yunit': self.scihdr['BUNIT'], 'skycube': None} 
 
         self.plot_spectrum(**self.plot_spec_dict)
 
         self.region_box_entry.delete(0, tk.END)
-        self.region_box_entry.insert(tk.END, '13, 44, 23, 54')
+        if self.stacked:
+            self.region_box_entry.insert(tk.END, '43, 43, 65, 65')
+        else:
+            self.region_box_entry.insert(tk.END, '13, 44, 23, 54')
 
     def save_cropped_data(self):
         """Save the cropped datacube within the good wavelength region, white-lighted image, and preliminary mask for ZAP"""
@@ -846,19 +934,20 @@ class KCWIViewerApp:
                         region_mask = region.to_mask().to_image(mhdu[0].shape).astype(bool)
                     else:
                         region_mask = region_mask | region.to_mask().to_image(mhdu[0].shape).astype(bool)
-
+            
             allmask = np.zeros_like(mhdu[0].data)
             allmask[region_mask] = 2
             allmask[edgemask] = 1
+
             maskhdu = fits.PrimaryHDU(allmask, header = mhdu[0].header)
 
             #save ZAP mask
             filename = f'{self.output}/{self.prefix}_{self.mindex:05d}_zap_mask.fits'
-            if os.path.exists(filename):
-                confirm = messagebox.askyesno("File Exists",
-                                              f'ZAP mask {self.prefix}_{self.mindex:05d}_zap_mask.fits already exists. Do you want to overwrite it?')
-                if not confirm:
-                    return
+            #if os.path.exists(filename):
+            #    confirm = messagebox.askyesno("File Exists",
+            #                                  f'ZAP mask {self.prefix}_{self.mindex:05d}_zap_mask.fits already exists. Do you want to overwrite it?')
+            #    if not confirm:
+            #        return
             self.insert_text(f"[INFO] Saving ZAP mask to {self.prefix}_{self.mindex:05d}_zap_mask.fits")
             check_dir(os.path.dirname(filename))
             maskhdu.writeto(filename, overwrite = True)
@@ -869,7 +958,12 @@ class KCWIViewerApp:
         
         hdr = hdu[0].header
         wave = (np.arange(hdr['NAXIS3']) + 1 - hdr['CRPIX3']) * hdr['CD3_3'] + hdr['CRVAL3']
-        wavegood_idx = np.where((wave >= hdr['WAVGOOD0']) & (wave <= hdr['WAVGOOD1']))[0]
+        wvlim=self.data_wvl_range
+        if self.data_wvl_range[0] < 0:
+            wvlim[0] = hdr['WAVGOOD0']
+        if self.data_wvl_range[1] < 0:
+            wvlim[1] = hdr['WAVGOOD1']
+        wavegood_idx = np.where((wave >= wvlim[0]) & (wave <= wvlim[1]))[0]
         
         for h in hdu:
             h.data = h.data[wavegood_idx]
@@ -877,7 +971,7 @@ class KCWIViewerApp:
         return hdu
 
 
-    def plot_spectrum(self, datacube, errcube, flagcube, z = 0, xrange = [12, 22], yrange = [43, 53], skycube = None, restore_limit = False,
+    def plot_spectrum(self, datacube, errcube = None, flagcube = None, z = 0, xrange = [12, 22], yrange = [43, 53], skycube = None, restore_limit = False,
                       yunit = 'electron', unzapped_skycube = False, show_lines = False):
         """
         plot the spectrum of a given region for
@@ -899,16 +993,18 @@ class KCWIViewerApp:
         self.ax.clear()
 
         datacube = datacube.copy()
-        errcube = errcube.copy()
         # datacube[flagcube > 0] = np.nan
         # errcube[flagcube > 0] = np.nan
 
         # spec = np.nanmean(datacube[:, yrange[0]:yrange[1], xrange[0]: xrange[1]], axis = (1,2))
         spec = np.nanmean(datacube[:, yrange[0]:yrange[1], xrange[0]: xrange[1]], axis = (1,2))
-        err = np.sqrt(np.nansum(errcube[:, yrange[0]:yrange[1], xrange[0]: xrange[1]]**2, axis = (1,2))) / np.sum(np.isfinite(errcube[:, yrange[0]:yrange[1], xrange[0]: xrange[1]]), axis = (1,2))
+        if errcube is not None:
+            errcube = errcube.copy()
+            err = np.sqrt(np.nansum(errcube[:, yrange[0]:yrange[1], xrange[0]: xrange[1]]**2, axis = (1,2))) / np.sum(np.isfinite(errcube[:, yrange[0]:yrange[1], xrange[0]: xrange[1]]), axis = (1,2))
+            self.ax.step(self.obswave / (1+z), err, color ='grey', lw = 1, label = 'sci err')
+            self.ax.fill_between(self.obswave / (1+z), spec - err, spec + err, color = 'lightgrey', step = 'pre')
+
         self.ax.step(self.obswave / (1+z), spec, color ='k', lw = 1, label = 'sci spec')
-        self.ax.step(self.obswave / (1+z), err, color ='grey', lw = 1, label = 'sci err')
-        self.ax.fill_between(self.obswave / (1+z), spec - err, spec + err, color = 'lightgrey', step = 'pre')
         
         if skycube is not None:
             skyspec = np.nanmean(skycube[:, yrange[0]:yrange[1], xrange[0]: xrange[1]], axis = (1,2))
@@ -1123,14 +1219,20 @@ class KCWIViewerApp:
         """
         The main function running the ZAP
         """
-        if self.index < 0:
+        if self.stacked.get():
+            pass
+        elif self.index < 0:
             self.insert_text('\n [ERROR] Set the science frame number first!')
             return
 
-        self.insert_text('\n' +f'[INFO] Running ZAP on {self.prefix}_{self.index:05d}_{self.ctype}.fits...')
+        self.insert_text('\n' +f'[INFO] Running ZAP on {self.prefix}_{self.index}_{self.ctype}.fits...')
 
         try:
-            self.scihdu = fits.open(f'{self.output}/{self.prefix}_{self.index:05d}_{self.ctype}.fits')
+            if self.stacked.get():
+                self.scihdu = fits.open(f'{self.output}/{self.prefix}-{self.index}_{self.ctype}.fits')
+                self.stacked_vcube = fits.open(f'{self.output}/{self.prefix}-{self.index}_vcubes.fits')
+            else:
+                self.scihdu = fits.open(f'{self.output}/{self.prefix}_{self.index:05d}_{self.ctype}.fits')
             self.scihdr = self.scihdu[0].header
         except FileNotFoundError:
             self.insert_text(f'[ERROR] Cropped data cubes not exist! Load the raw DRP-reduced cubes and save the cropped cubes first!')
@@ -1207,11 +1309,11 @@ class KCWIViewerApp:
             skyhdu = fits.ImageHDU(data=skycube, header=self.scihdu[0].header)
             skyhdu.name = 'SKYMODEL_ZAP'
             self.cleanhdu.append(skyhdu)
+            check_dir(self.output)
+            self.cleanhdu.writeto(f'{self.output}/{self.prefix}_{self.index:05d}_zap_{self.ctype}.fits', overwrite = True)
         else:
             self.cleanhdu = self.scihdu.copy()
 
-        check_dir(self.output)
-        self.cleanhdu.writeto(f'{self.output}/{self.prefix}_{self.index:05d}_zap_{self.ctype}.fits', overwrite = True)
 
         #Need to run the DAR correction for the unrectified cube
         if self.ctype == 'icube':
@@ -1409,17 +1511,23 @@ class KCWIViewerApp:
                 self.insert_text(f'[WARNING] No telluric model from standard star available. Skip the telluric correction.')
                 self.cleanhdu_flux = self.cleanhdu.copy()
             else:
-                self.insert_text(f'[ERROR] No sensitive function and telluric model available! Cannot apply the flux calibration!')
+                self.insert_text(f'[ERROR] No sensitivity function and telluric model available! Cannot apply the flux calibration!')
                 return
 
         else:
-            use = (self.std['wave']>= self.obswave[0]) & (self.std['wave'] <= self.obswave[-1])
-
-            try:
-                tellmodel = self.std['tellmodel'][use]**(self.cleanhdu[0].header['AIRMASS']) #convert the telluric model at AM=1.0 to the real AM
-            except:
-                tellmodel = 1.0
-                self.insert_text(f'[WARNING] Cannot find the telluric model! Running the flux calibration without telluric correction...') 
+            if (self.std['wave'][0] != self.obswave[0]) | (self.std['wave'][-1] != self.obswave[-1]):
+                self.insert_text(f'[WARNING] The wavelength range of the standard star does not match the science cube! Interpolating the standard star to the science cube wavelength range...')
+                invsens_model = np.interp(self.obswave, self.std['wave'], self.std['invsens_model'],right= 0, left = 0)
+                tellmodel = np.interp(self.obswave, self.std['wave'], self.std['tellmodel']**(self.cleanhdu[0].header['AIRMASS']),right= 0, left = 0)
+            else:
+                invsens_model = self.std['invsens_model']
+                tellmodel = self.std['tellmodel']**(self.cleanhdu[0].header['AIRMASS'])
+            #use = (self.std['wave']>= self.obswave[0]) & (self.std['wave'] <= self.obswave[-1])
+            #try:
+            #    tellmodel = self.std['tellmodel']**(self.cleanhdu[0].header['AIRMASS']) #convert the telluric model at AM=1.0 to the real AM
+            #except:
+            #    tellmodel = 1.0
+            #    self.insert_text(f'[WARNING] Cannot find the telluric model! Running the flux calibration without telluric correction...') 
 
             #flux calibration and telluric correction
             if self.ctype == 'icubes':
@@ -1428,18 +1536,21 @@ class KCWIViewerApp:
                     mscal = 1. / tellmodel
                 else:
                     mscal = np.ones_like(tellmodel)
+                    self.insert_text(f'[INFO] Telluric correction skipped as user requested!')
+
             else:
                 self.insert_text(f'[INFO] Running the flux calibration and telluric correction...') 
                 if self.use_invsens.get():
-                    mscal = self.std['invsens_model'] * 1e16 / self.cleanhdu[0].header['XPOSURE'] #normalize by the exposure time
+                    mscal = invsens_model * 1e16 / self.cleanhdu[0].header['XPOSURE'] #normalize by the exposure time
                     mscal, self.cleanhdu[0].header = kcwi_correct_extin(mscal, self.cleanhdu[0].header)
                 else:
-                    mscal = np.ones_like(self.std['invsens_model'])
+                    mscal = np.ones_like(invsens_model)
 
                 if self.use_telluric.get():
-                    mscal = mscal[use] / tellmodel #include the telluric correction
+                    mscal = mscal / tellmodel #include the telluric correction
                 else:
-                    mscal = mscal[use]
+                    mscal = mscal
+                    self.insert_text(f'[INFO] Telluric correction skipped as user requested!')
 
             #reshpae the 1D mscal to 3D 
             mscal = mscal[:, np.newaxis, np.newaxis]
@@ -1447,7 +1558,10 @@ class KCWIViewerApp:
             use = ()
             self.cleanhdu_flux = self.cleanhdu.copy() #flux-calibrated cube
             self.cleanhdu_flux[0].data *= mscal
-            self.cleanhdu_flux['UNCERT'].data *= mscal
+            if self.stacked.get():
+                self.stacked_vcube[0].data *= mscal**2
+            else:
+                self.cleanhdu_flux['UNCERT'].data *= mscal
             self.cleanhdu_flux[0].header['BUNIT'] = '1e-16 erg / (Angstrom cm2 s)'
             self.cleanhdu_flux[0].header['STDCOR'] = (True, 'std corrected?')
             self.cleanhdu_flux[0].header['MSFILE'] = ('{}_invsens_updated.fits'.format(self.std['frame']), 'Master std filename')
@@ -1475,7 +1589,11 @@ class KCWIViewerApp:
 
             #write the new cubes
             check_dir(self.output)
-            self.cleanhdu_flux.writeto(f'{self.output}/{self.prefix}_{self.index:05d}_zap_icubes.fits', overwrite = True)
+            if self.stacked.get() == False:
+                self.cleanhdu_flux.writeto(f'{self.output}/{self.prefix}_{self.index:05d}_zap_icubes.fits', overwrite = True)
+            else:
+                self.cleanhdu_flux.writeto(f'{self.output}/{self.prefix}-{self.index}_final_icubes.fits', overwrite = True)
+                self.stacked_vcube.writeto(f'{self.output}/{self.prefix}-{self.index}_final_vcubes.fits', overwrite = True)
                 
 
         #save the white-lighted image of the clean cube
@@ -1489,7 +1607,10 @@ class KCWIViewerApp:
         mhdu = fits.ImageHDU(mask, header = hdr2d)
         hdulist = fits.HDUList([wlhdu, mhdu])
         check_dir(self.output)
-        hdulist.writeto(f'{self.output}/{self.prefix}_{self.index:05d}_zapclean_wlimg.fits', overwrite = True)
+        if self.stacked.get():
+            hdulist.writeto(f'{self.output}/{self.prefix}-{self.index}_final_wlimg.fits', overwrite = True)
+        else:
+            hdulist.writeto(f'{self.output}/{self.prefix}_{self.index:05d}_zapclean_wlimg.fits', overwrite = True)
 
         #TODO make the errcube_combined as the official cleanhdu_flux['UNCERT'].data
         # mask = fits.getdata(maskpath) #get the mask to avoid the edge pixel. Should be similar if using the off-field sky
@@ -1506,14 +1627,22 @@ class KCWIViewerApp:
                                     'z': self.redshift, 'yunit': self.cleanhdu_flux[0].header['BUNIT'], 
                                     'skycube': self.cleanhdu_flux['UNZAPPED'].data, 'unzapped_skycube': True,
                                     'restore_limit': False, 'show_lines': True}
+        elif self.stacked.get():
+            self.plot_spec_dict = {'datacube': self.cleanhdu_flux[0].data, 'errcube': np.sqrt(self.stacked_vcube[0].data),
+                                    'flagcube': None, 
+                                    'z': self.redshift, 'yunit': self.cleanhdu_flux[0].header['BUNIT'], 
+                                    'skycube': None, 'unzapped_skycube': False,
+                                    'restore_limit': False, 'show_lines': True}
         else:
             self.plot_spec_dict = {'datacube': self.cleanhdu_flux[0].data, 'errcube': self.cleanhdu_flux['UNCERT'].data,
                                     'flagcube': self.cleanhdu_flux['FLAGS'].data, 
                                     'z': self.redshift, 'yunit': self.cleanhdu_flux[0].header['BUNIT'], 
                                     'skycube': None, 'unzapped_skycube': False,
                                     'restore_limit': False, 'show_lines': True}
-
-        self.insert_text(f'[INFO] ZAP Done for {self.prefix}_{self.index:05d}!')
+        if self.stacked.get():
+            self.insert_text(f'[INFO] process Done for {self.prefix}-{self.index}!')
+        else:
+            self.insert_text(f'[INFO] process Done for {self.prefix}_{self.index:05d}!')
         self.plot_spectrum(**self.plot_spec_dict)
         inst = ("\n[INSTRUCTION] Press 'n' to turn off the pre-ZAP spec;"
                 "press 's' to display the pre-ZAP spec;"
@@ -1548,7 +1677,20 @@ class KCWIViewerApp:
             hdr = hdu[0].header
             wvl = (np.arange(hdr['NAXIS1']) + 1 - hdr['CRPIX1']) * hdr['CDELT1'] + hdr['CRVAL1']
             #Add 3A on each side to give the spline-fit some buffer 
-            good = np.where((wvl >= hdr['WAVGOOD0'] - 3) & (wvl<= hdr['WAVGOOD1'] + 3))[0]
+            wvlim = self.std_wvl_range  # or [5000, -1]
+
+            # Check and replace based on position
+            if self.std_wvl_range[0] < 0:
+                wvlim[0] = hdr["WAVGOOD0"]
+            if self.std_wvl_range[1] < 0:
+                wvlim[1] = hdr["WAVGOOD1"]
+            
+            self.insert_text(f"[INFO] The wavelength range for the invsens curve is {wvlim[0]} - {wvlim[1]}")
+            #if hdr['CAMERA'] == 'RED':
+            #    good = np.where((wvl >=5600.) & (wvl <= hdr['WAVGOOD1']))[0]#hdr['WAVGOOD0']
+            #elif hdr['CAMERA'] == 'BLUE':
+            #    good = np.where((wvl >= hdr['WAVGOOD0'] ) & (wvl <= hdr['WAVGOOD1']))[0]
+            good = np.where((wvl >= wvlim[0]) & (wvl<= wvlim[1]))[0]
             self.std['invsens_hdr'] = hdr
 
             #raw invsens from the DRP
@@ -1613,8 +1755,11 @@ class KCWIViewerApp:
                     std = fits.getdata('{0}/{1}.fits'.format(self.stddir, self.std['name']))
                 except ValueError:
                     self.insert_text(f"Cannot find the std spec for {self.std_name} in {self.stddir}")
-
-                use = np.where((std['WAVELENGTH'] >= hdr['WAVGOOD0'] - 5) & (std['WAVELENGTH'] <= hdr['WAVGOOD1'] + 5))[0] #only load the spectrum in the good wavelength region
+                if hdr['CAMERA'] == 'RED':
+                    use = np.where((std['WAVELENGTH'] >= 5600) & (std['WAVELENGTH'] <= hdr['WAVGOOD1'] + 5))[0]
+                elif hdr['CAMERA'] == 'BLUE':
+                    use = np.where((std['WAVELENGTH'] >= hdr['WAVGOOD0'] - 5) & (std['WAVELENGTH'] <= 5650))[0]
+                #use = np.where((std['WAVELENGTH'] >= hdr['WAVGOOD0'] - 5) & (std['WAVELENGTH'] <= hdr['WAVGOOD1'] + 5))[0] #only load the spectrum in the good wavelength region
                 self.std['spec_calib'] = np.column_stack((std['WAVELENGTH'][use], std['FLUX'][use]))
 
             # self.std['flag'] = self.mask_skyline_region(self.std['wave']) #flag indicated if a region is masked out
@@ -1690,7 +1835,7 @@ class KCWIViewerApp:
         self.ax.step(self.std['wave'], self.std['counts'] * self.std['invsens_model_drp'], 
                         color = 'r', lw =1, label = 'Flux calibrated spec (DRP)', where = 'mid', alpha = 0.5) #raw count x invsens = flux-calibrated spec
         if self.std['name'] != 'combined':
-            self.ax.plot(self.std['spec_calib'][:,0], self.std['spec_calib'][:,1], color = 'k', label = 'Standard star template')
+            self.ax.step(self.std['spec_calib'][:,0], self.std['spec_calib'][:,1], color = 'k', label = 'Standard star template')
 
         invsens_region = np.where(self.std['flag'] == 1)[0]
         telluric_region = np.where(self.std['flag'] == 2)[0]
@@ -1917,9 +2062,12 @@ class KCWIViewerApp:
         if event.key == 'a':
             #find the index of the point closest to the mouse location
             # idx = np.argmin((self.std['wave'] - event.xdata)**2 + (self.std['counts'] * self.std['invsens_model_drp'] - event.ydata)**2) 
+            li = interp1d(self.std['wave'], self.std['counts'], kind = 'linear', bounds_error=False, fill_value = 0)
             idx = np.argmin(np.abs(self.std['wave'] - event.xdata))
+            counts_knots = li(self.std['wave'][idx])
             self.std['xknots'] = np.append(self.std['xknots'], self.std['wave'][idx])
             self.std['yknots'] = np.append(self.std['yknots'], (self.std['invsens_data'])[idx])
+            print("Adding knot at (wave, flam):",self.std['wave'][idx], (self.std['invsens_data'])[idx]*counts_knots)
 
             #sort the knots
             index_sort = np.argsort(self.std['xknots'])
@@ -2030,6 +2178,7 @@ class KCWIViewerApp:
             ups = use[index]
             if np.sum(ups) > len(ups)/4:
                 yknots[i] = np.median(dps[ups])
+                print(yknots[i], xknot)
             else:
                 yknots[i] = np.nan
         index = ~np.isnan(yknots)

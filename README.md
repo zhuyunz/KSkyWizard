@@ -1,5 +1,5 @@
 # KCWI Sky Wizard
-**Version: 0.1.2024-12-19**
+**Version: 0.2.2025-06-04**
 
 ---
 
@@ -56,6 +56,12 @@ for KCWI/KCRM data. Users must first reduce the data using the [KCWI Data Reduct
    cd /path/to/KSkyWizard
    pip install .
    ```
+  
+## New in  version 0.2.2025-06-04
+
+1. added feature that allows customized wavelength range for both invsens and cropped data product;
+2. An option that forces the code to conduct sky subtraction/telluric correction on stacked data (per Chuck's request. **Not recommended** unless you know what you are doing);
+3. A new ipynb that describes how to run everything in batch, significantly reducing human intervention. This is especially useful if you have to repeat the same reduction procedure for large amount of frames. YD: I have tested the ipynb version produces the exact same data product.
 
 ## Download the Mauna Kea telluric data
 
@@ -102,7 +108,7 @@ Run the KCWI Data Reduction Pipeline:
    
    - Process the data using [`KCWI DRP`](https://kcwi-drp.readthedocs.io/en/latest/), preferably following the [`KCWIKit` instruction](https://github.com/yuguangchen1/KcwiKit?tab=readme-ov-file#instuctions).
 
-   - (Optional) Skip the sky subtraction since this tool handles it, by turning on the `-k` flag for the science frames.
+  You may skip the sky subtraction in DRP if no median filtering was needed since this tool handles it, by turning on the `-k` flag for the science frames.
    
       Eample:
 
@@ -153,7 +159,9 @@ This process is divided into two steps:
 
 #### Step 1: Load and Refine the Sensitivity Curve
 1. **Open the DRP Sensitivity File**: 
+   - By default, this program only consider the part inside WAVGOOD. If you want to do the calibration within a different wavelength range (potentially including the 5600 dichroic edge). Change the lower, upper limits in the box from -1 to the values you want, press 'set'. 
    - Browse and select the `*_invsens.fits` file from the DRP outputs using the `Open DRP invsens` button.
+
    
    ![Select DRP Invsens File](https://github.com/user-attachments/assets/9a3afb1e-26dc-43ae-8576-b629e50c32b1)
 
@@ -186,7 +194,7 @@ This process is divided into two steps:
 
 ---
 
-#### Tips:
+#### Notes:
 - **What to Include and Exclude During Fitting?**  
   - For the **sensitivity curve fitting** (light green region):
     - **Include**: Only the stellar continuum.  
