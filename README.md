@@ -1,5 +1,5 @@
 # KCWI Sky Wizard
-**Version: 0.2.2025-06-04**
+**Version: 0.2.2026-11-05**
 
 ---
 
