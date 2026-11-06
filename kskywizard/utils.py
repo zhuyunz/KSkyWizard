@@ -61,12 +61,12 @@ def telluric_correct(infile_path: str,  star_ra: float, star_dec: float,
     #         par['telluric']['telgridfile'] = par['sensfunc']['IR']['telgridfile']
     par['telluric']['telgridfile'] = telgridfile
     par['telluric']['teltype'] = 'grid'
-
+    par['telluric']['maxiter'] = 50
     # Parse the output filename
     outfile = re.sub('.fits', '_tellcorr.fits', infile_path)
     modelfile = re.sub('.fits', '_tellmodel.fits', infile_path)
 
-    try:
+    try:# this function leave telluric correct = 0 at wavelength edges. Could result in inf in the final spectrum.
         TelStar = telluric.star_telluric(infile_path, par['telluric']['telgridfile'],
                                         modelfile, outfile,
                                         star_type=par['telluric']['star_type'],
@@ -87,8 +87,9 @@ def telluric_correct(infile_path: str,  star_ra: float, star_dec: float,
                                         maxiter=par['telluric']['maxiter'],
                                         popsize=par['telluric']['popsize'],
                                         tol=par['telluric']['tol'])
+        
     except ValueError:
-        print(f"[ERROR] Telluric correction of {os.path.base(infile_path)} FAILED!")
+        print(f"[ERROR] Telluric correction of {infile_path} FAILED!")
 
 
 def kcwi_correct_extin(img0, hdr0):
