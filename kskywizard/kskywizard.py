@@ -862,10 +862,13 @@ class KCWIViewerApp:
             indices.append(self.index)
         if self.index2 > 0:
             
-            #scale the sky spectrum if the exposure time between the science and sky doesn't match.
-            scaling_factor = self.scihdr['XPOSURE'] / self.skyhdu[0].header['XPOSURE']
-            self.skyhdu[0].data *= scaling_factor
-            self.skyhdu[0].header['XPOSURE'] = self.scihdr['XPOSURE']
+            #scale the sky only if the cubes are in counts; icubes are already per second
+            if self.ctype == 'icubes':
+                scaling_factor = 1.0
+            else:
+                scaling_factor = self.scihdr['XPOSURE'] / self.skyhdu[0].header['XPOSURE']
+                self.skyhdu[0].data *= scaling_factor
+                self.skyhdu[0].header['XPOSURE'] = self.scihdr['XPOSURE']
             self.insert_text(f"[INFO] Scale the sky cube by {scaling_factor:0.2f}")
 
             hdu_list.append(self.skyhdu)
@@ -912,8 +915,11 @@ class KCWIViewerApp:
         edgemask = mhdu[1].data > 1
 
         region_path = f'{self.output}/{self.prefix}_{mindex:05d}.reg'
-        if not os.path.exists(region_path):
+        mask_filename = f'{self.output}/{self.prefix}_{self.mindex:05d}_zap_mask.fits'
+        if (not os.path.exists(region_path)) and (not os.path.exists(mask_filename)):
             self.insert_text(f"[ERROR] Region file {self.prefix}_{mindex:05d}.reg not exists!")
+        elif (not os.path.exists(region_path)) and os.path.exists(mask_filename):
+            self.insert_text(f"[INFO] Using the existing ZAP mask file {self.prefix}_{mindex:05d}_zap_mask.fits for {self.prefix}_{self.index:05d}")
         else:
             self.insert_text(f"[INFO] Reading region file {self.prefix}_{mindex:05d}.reg for {self.prefix}_{self.index:05d}")
             
@@ -942,15 +948,15 @@ class KCWIViewerApp:
             maskhdu = fits.PrimaryHDU(allmask, header = mhdu[0].header)
 
             #save ZAP mask
-            filename = f'{self.output}/{self.prefix}_{self.mindex:05d}_zap_mask.fits'
+            mask_filename = f'{self.output}/{self.prefix}_{self.mindex:05d}_zap_mask.fits'
             #if os.path.exists(filename):
             #    confirm = messagebox.askyesno("File Exists",
             #                                  f'ZAP mask {self.prefix}_{self.mindex:05d}_zap_mask.fits already exists. Do you want to overwrite it?')
             #    if not confirm:
             #        return
             self.insert_text(f"[INFO] Saving ZAP mask to {self.prefix}_{self.mindex:05d}_zap_mask.fits")
-            check_dir(os.path.dirname(filename))
-            maskhdu.writeto(filename, overwrite = True)
+            check_dir(os.path.dirname(mask_filename))
+            maskhdu.writeto(mask_filename, overwrite = True)
 
     
     def crop_cube(self, hdu):
@@ -1518,10 +1524,18 @@ class KCWIViewerApp:
             if (self.std['wave'][0] != self.obswave[0]) | (self.std['wave'][-1] != self.obswave[-1]):
                 self.insert_text(f'[WARNING] The wavelength range of the standard star does not match the science cube! Interpolating the standard star to the science cube wavelength range...')
                 invsens_model = np.interp(self.obswave, self.std['wave'], self.std['invsens_model'],right= 0, left = 0)
-                tellmodel = np.interp(self.obswave, self.std['wave'], self.std['tellmodel']**(self.cleanhdu[0].header['AIRMASS']),right= 0, left = 0)
+                if self.use_telluric.get():
+                    tellmodel = np.interp(self.obswave, self.std['wave'], self.std['tellmodel']**(self.cleanhdu[0].header['AIRMASS']),right= 0, left = 0)
+                else:
+                    tellmodel = np.ones_like(self.obswave)
+                    #self.insert_text(f'[INFO] Telluric correction skipped as user requested!')
             else:
                 invsens_model = self.std['invsens_model']
-                tellmodel = self.std['tellmodel']**(self.cleanhdu[0].header['AIRMASS'])
+                if self.use_telluric.get():
+                    tellmodel = self.std['tellmodel']**(self.cleanhdu[0].header['AIRMASS'])
+                else:
+                    tellmodel = np.ones_like(self.std['wave'])
+                    #self.insert_text(f'[INFO] Telluric correction skipped as user requested!')
             #use = (self.std['wave']>= self.obswave[0]) & (self.std['wave'] <= self.obswave[-1])
             #try:
             #    tellmodel = self.std['tellmodel']**(self.cleanhdu[0].header['AIRMASS']) #convert the telluric model at AM=1.0 to the real AM
@@ -1552,7 +1566,7 @@ class KCWIViewerApp:
                     mscal = mscal
                     self.insert_text(f'[INFO] Telluric correction skipped as user requested!')
 
-            #reshpae the 1D mscal to 3D 
+            #reshape the 1D mscal to 3D 
             mscal = mscal[:, np.newaxis, np.newaxis]
             #also need to crop the mscal as the wavelength of the std goes a little beyond WAVGOOD
             use = ()
